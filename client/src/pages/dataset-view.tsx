@@ -13,8 +13,14 @@ import { useState, useEffect } from "react";
 type FitFile = {
   id: number;
   name: string;
-  createdAt: string;
   filePath: string;
+};
+
+type Dataset = {
+  id: number;
+  name: string;
+  createdAt: string;
+  fitFiles: FitFile[];
 };
 
 type DataPoint = {
@@ -37,27 +43,21 @@ export default function DatasetView() {
   const id = params?.id;
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
 
-  // Get all available datasets
-  const { data: files = [], isLoading: isLoadingFiles } = useQuery<FitFile[]>({
-    queryKey: ["fit-files"],
-    queryFn: () => fetch("/api/fit-files").then(res => res.json()),
+  // Get the dataset and its files
+  const { data: dataset, isLoading: isLoadingDataset } = useQuery<Dataset>({
+    queryKey: ["datasets", id],
+    queryFn: () => fetch(`/api/fit-files/${id}`).then(res => res.json()),
+    enabled: !!id,
   });
 
-  // Set initial selection when files load
-  useEffect(() => {
-    if (id && !selectedFileIds.includes(parseInt(id))) {
-      setSelectedFileIds([parseInt(id)]);
-    }
-  }, [id, files]);
-
-  // Get data only for selected files
-  const { data: datasets = [], isLoading: isLoadingData } = useQuery<ProcessedDataSet[]>({
+  // Get data for selected files
+  const { data: fileData = [], isLoading: isLoadingData } = useQuery<ProcessedDataSet[]>({
     queryKey: ["fit-files-data", selectedFileIds],
     queryFn: async () => {
       const dataPromises = selectedFileIds.map(async fileId => {
-        const file = files.find(f => f.id === fileId);
+        const file = dataset?.fitFiles.find(f => f.id === fileId);
         if (!file) return null;
-        const response = await fetch(`/api/fit-files/${fileId}/data`);
+        const response = await fetch(`/api/fit-files/file/${fileId}/data`);
         const data = await response.json();
         return {
           name: file.name,
@@ -67,10 +67,17 @@ export default function DatasetView() {
       const results = await Promise.all(dataPromises);
       return results.filter((result): result is ProcessedDataSet => result !== null);
     },
-    enabled: selectedFileIds.length > 0 && files.length > 0,
+    enabled: selectedFileIds.length > 0 && !!dataset,
   });
 
-  const isLoading = isLoadingFiles || isLoadingData;
+  // Set initial selection when dataset loads
+  useEffect(() => {
+    if (dataset?.fitFiles) {
+      setSelectedFileIds(dataset.fitFiles.map(f => f.id));
+    }
+  }, [dataset]);
+
+  const isLoading = isLoadingDataset || isLoadingData;
 
   if (isLoading) {
     return (
@@ -84,10 +91,10 @@ export default function DatasetView() {
     );
   }
 
-  if (files.length === 0) {
+  if (!dataset) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">No datasets found</h1>
+        <h1 className="text-2xl font-bold mb-4">Dataset not found</h1>
         <Link href="/dashboard">
           <Button>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -97,9 +104,6 @@ export default function DatasetView() {
       </div>
     );
   }
-
-  // Find the current dataset
-  const currentDataset = files.find(f => f.id === parseInt(id || ""));
 
   const handleFileSelection = (fileId: number) => {
     setSelectedFileIds(prev => {
@@ -113,9 +117,7 @@ export default function DatasetView() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          {currentDataset ? currentDataset.name : 'Dataset Comparison'}
-        </h1>
+        <h1 className="text-2xl font-bold">{dataset.name}</h1>
         <Link href="/dashboard">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -126,11 +128,11 @@ export default function DatasetView() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Select Datasets to Compare</CardTitle>
+          <CardTitle>Select Files to Compare</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {files.map(file => (
+            {dataset.fitFiles.map(file => (
               <div key={file.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={`file-${file.id}`}
@@ -146,7 +148,7 @@ export default function DatasetView() {
 
       <div className="grid gap-6">
         <MetricGraph
-          datasets={datasets}
+          datasets={fileData}
           metricKey="power"
           title="Power Comparison"
           color="#ef4444"
@@ -154,7 +156,7 @@ export default function DatasetView() {
         />
 
         <MetricGraph
-          datasets={datasets}
+          datasets={fileData}
           metricKey="heartRate"
           title="Heart Rate Comparison"
           color="#ec4899"
@@ -162,7 +164,7 @@ export default function DatasetView() {
         />
 
         <MetricGraph
-          datasets={datasets}
+          datasets={fileData}
           metricKey="speed"
           title="Speed Comparison"
           color="#3b82f6"
@@ -170,7 +172,7 @@ export default function DatasetView() {
         />
 
         <MetricGraph
-          datasets={datasets}
+          datasets={fileData}
           metricKey="cadence"
           title="Cadence Comparison"
           color="#10b981"
@@ -178,7 +180,7 @@ export default function DatasetView() {
         />
 
         <MetricGraph
-          datasets={datasets}
+          datasets={fileData}
           metricKey="altitude"
           title="Elevation Comparison"
           color="#8b5cf6"

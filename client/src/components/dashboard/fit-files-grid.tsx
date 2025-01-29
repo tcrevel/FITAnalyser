@@ -22,14 +22,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-type FitFile = {
+type Dataset = {
   id: number;
   name: string;
   createdAt: string;
-  filePath: string;
+  fitFiles: Array<{
+    id: number;
+    name: string;
+    filePath: string;
+  }>;
 };
 
-async function uploadFitFiles(formData: FormData) {
+async function uploadDataset(formData: FormData) {
   const response = await fetch("/api/fit-files", {
     method: "POST",
     body: formData,
@@ -40,12 +44,12 @@ async function uploadFitFiles(formData: FormData) {
   return response.json();
 }
 
-async function deleteFitFile(id: number) {
+async function deleteDataset(id: number) {
   const response = await fetch(`/api/fit-files/${id}`, {
     method: "DELETE",
   });
   if (!response.ok) {
-    throw new Error("Failed to delete file");
+    throw new Error("Failed to delete dataset");
   }
   return response.json();
 }
@@ -54,22 +58,22 @@ export function FitFilesGrid() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  const { data: files = [], isLoading } = useQuery<FitFile[]>({
-    queryKey: ["fit-files"],
+  const { data: datasets = [], isLoading } = useQuery<Dataset[]>({
+    queryKey: ["datasets"],
     queryFn: () => fetch("/api/fit-files").then(res => res.json()),
   });
 
   const uploadMutation = useMutation({
-    mutationFn: uploadFitFiles,
+    mutationFn: uploadDataset,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["fit-files"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
       toast({
         title: "Success",
         description: "Files uploaded successfully",
       });
-      // Navigate to the first uploaded dataset
-      if (Array.isArray(data) && data.length > 0) {
-        setLocation(`/dashboard/dataset/${data[0].id}`);
+      // Navigate to the dataset view
+      if (data?.id) {
+        setLocation(`/dashboard/dataset/${data.id}`);
       }
     },
     onError: () => {
@@ -82,18 +86,18 @@ export function FitFilesGrid() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteFitFile,
+    mutationFn: deleteDataset,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fit-files"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
       toast({
         title: "Success",
-        description: "File deleted successfully",
+        description: "Dataset deleted successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete file",
+        description: "Failed to delete dataset",
         variant: "destructive",
       });
     },
@@ -110,10 +114,7 @@ export function FitFilesGrid() {
     if (fileInput?.files && fileInput.files.length > 0) {
       Array.from(fileInput.files).forEach((file, index) => {
         formData.append('files', file);
-        // If multiple files, append index to name
-        const baseName = nameInput?.value || 'Dataset';
-        const name = fileInput.files && fileInput.files.length > 1 ? `${baseName} ${index + 1}` : baseName;
-        formData.append('names[]', name);
+        formData.append('name', nameInput?.value || 'New Dataset');
       });
     }
 
@@ -122,7 +123,7 @@ export function FitFilesGrid() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Are you sure you want to delete this file?")) {
+    if (confirm("Are you sure you want to delete this dataset and all its files?")) {
       await deleteMutation.mutateAsync(id);
     }
   };
@@ -135,7 +136,7 @@ export function FitFilesGrid() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Add Datasets
+              New Dataset
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -149,7 +150,7 @@ export function FitFilesGrid() {
                   id="name" 
                   name="name" 
                   required 
-                  placeholder="For multiple files, this will be the base name"
+                  placeholder="Enter a name for this dataset"
                 />
               </div>
               <div className="space-y-2">
@@ -164,7 +165,7 @@ export function FitFilesGrid() {
                   className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold hover:file:bg-violet-100 file:bg-violet-50 file:text-violet-700"
                 />
                 <p className="text-sm text-muted-foreground">
-                  You can select multiple .fit files
+                  Select multiple .fit files to compare in this dataset
                 </p>
               </div>
               <Button type="submit" className="w-full" disabled={uploadMutation.isPending}>
@@ -181,6 +182,7 @@ export function FitFilesGrid() {
           <TableHeader>
             <TableRow>
               <TableHead>Dataset Name</TableHead>
+              <TableHead>Files</TableHead>
               <TableHead>Created Date</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -188,36 +190,37 @@ export function FitFilesGrid() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center">
+                <TableCell colSpan={4} className="text-center">
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : files.length === 0 ? (
+            ) : datasets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center">
+                <TableCell colSpan={4} className="text-center">
                   No datasets found
                 </TableCell>
               </TableRow>
             ) : (
-              files.map((file) => (
-                <TableRow key={file.id}>
-                  <TableCell className="font-medium">{file.name}</TableCell>
+              datasets.map((dataset) => (
+                <TableRow key={dataset.id}>
+                  <TableCell className="font-medium">{dataset.name}</TableCell>
+                  <TableCell>{dataset.fitFiles.length} files</TableCell>
                   <TableCell>
-                    {format(new Date(file.createdAt), "MMM d, yyyy h:mm a")}
+                    {format(new Date(dataset.createdAt), "MMM d, yyyy h:mm a")}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setLocation(`/dashboard/dataset/${file.id}`)}
+                        onClick={() => setLocation(`/dashboard/dataset/${dataset.id}`)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(file.id)}
+                        onClick={() => handleDelete(dataset.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
