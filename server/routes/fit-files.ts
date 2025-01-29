@@ -66,7 +66,7 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
 router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: eq(datasets.id, parseInt(req.params.id)),
+      where: eq(datasets.id, req.params.id),
       with: {
         fitFiles: true,
       },
@@ -91,7 +91,7 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
 router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
-      where: eq(fitFiles.id, parseInt(req.params.id)),
+      where: eq(fitFiles.id, req.params.id),
       with: {
         dataset: true,
       },
@@ -148,7 +148,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
     }));
 
     res.json(processedData);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error parsing fit file:", error);
     res.status(500).json({ error: `Failed to parse fit file: ${error.message}` });
   }
@@ -173,7 +173,7 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 
     // Add all files to the dataset
     const insertedFiles = await Promise.all(
-      (req.files as Express.Multer.File[]).map(async (file, index) => {
+      (req.files as Express.Multer.File[]).map(async (file) => {
         const [newFile] = await db.insert(fitFiles)
           .values({
             name: file.originalname,
@@ -201,7 +201,7 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: eq(datasets.id, parseInt(req.params.id)),
+      where: eq(datasets.id, req.params.id),
       with: {
         fitFiles: true,
       },

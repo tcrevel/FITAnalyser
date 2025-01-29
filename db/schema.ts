@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -9,7 +9,7 @@ export const users = pgTable("users", {
 });
 
 export const datasets = pgTable("datasets", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   userId: integer("user_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -17,9 +17,9 @@ export const datasets = pgTable("datasets", {
 });
 
 export const fitFiles = pgTable("fit_files", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  datasetId: integer("dataset_id")
+  datasetId: uuid("dataset_id")
     .references(() => datasets.id, { onDelete: 'cascade' })
     .notNull(),
   filePath: text("file_path").notNull(),
