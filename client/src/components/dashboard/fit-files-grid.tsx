@@ -7,23 +7,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, Plus, Trash2, Upload } from "lucide-react";
+import { Eye, Plus, Trash2, Settings, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DatasetEditModal } from "./dataset-edit-modal";
 
 type Dataset = {
   id: number;
@@ -60,6 +53,8 @@ async function deleteDataset(id: number) {
 export function FitFilesGrid() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [datasetToDelete, setDatasetToDelete] = useState<number | null>(null);
 
@@ -152,7 +147,7 @@ export function FitFilesGrid() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Your Datasets</h2>
-        <Dialog>
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -240,6 +235,13 @@ export function FitFilesGrid() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => setEditingDataset(dataset)}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleDeleteClick(dataset.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -253,7 +255,14 @@ export function FitFilesGrid() {
         </Table>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {editingDataset && (
+        <DatasetEditModal
+          open={!!editingDataset}
+          onOpenChange={(open) => !open && setEditingDataset(null)}
+          dataset={editingDataset}
+        />
+      )}
+
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

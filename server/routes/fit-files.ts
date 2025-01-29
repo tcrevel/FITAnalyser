@@ -237,4 +237,67 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// Update dataset name
+router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const dataset = await db.query.datasets.findFirst({
+      where: eq(datasets.id, req.params.id),
+    });
+
+    if (!dataset) {
+      return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    if (dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    const [updatedDataset] = await db.update(datasets)
+      .set({ name: req.body.name })
+      .where(eq(datasets.id, req.params.id))
+      .returning();
+
+    res.json(updatedDataset);
+  } catch (error) {
+    console.error("Error updating dataset:", error);
+    res.status(500).json({ error: "Failed to update dataset" });
+  }
+});
+
+// Delete a single file from a dataset
+router.delete("/:datasetId/file/:fileId", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const file = await db.query.fitFiles.findFirst({
+      where: eq(fitFiles.id, req.params.fileId),
+      with: {
+        dataset: true,
+      },
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    if (file.dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    // Delete the physical file
+    try {
+      await fs.promises.unlink(file.filePath);
+    } catch (error) {
+      console.error("Error deleting file from disk:", error);
+    }
+
+    // Delete the file record from database
+    await db.delete(fitFiles)
+      .where(eq(fitFiles.id, file.id));
+
+    res.json({ message: "File deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting file:", error);
+    res.status(500).json({ error: "Failed to delete file" });
+  }
+});
+
 export default router;

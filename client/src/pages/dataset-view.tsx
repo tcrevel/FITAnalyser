@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +8,7 @@ import { MetricGraph } from "@/components/dashboard/metric-graph";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
+import { DatasetEditModal } from "@/components/dashboard/dataset-edit-modal";
 
 type FitFile = {
   id: number;
@@ -42,15 +42,14 @@ export default function DatasetView() {
   const [, params] = useRoute("/dashboard/dataset/:id");
   const id = params?.id;
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
-  // Get the dataset and its files
   const { data: dataset, isLoading: isLoadingDataset } = useQuery<Dataset>({
     queryKey: ["datasets", id],
     queryFn: () => fetch(`/api/fit-files/${id}`).then(res => res.json()),
     enabled: !!id,
   });
 
-  // Get data for selected files
   const { data: fileData = [], isLoading: isLoadingData } = useQuery<ProcessedDataSet[]>({
     queryKey: ["fit-files-data", selectedFileIds],
     queryFn: async () => {
@@ -70,7 +69,6 @@ export default function DatasetView() {
     enabled: selectedFileIds.length > 0 && !!dataset,
   });
 
-  // Set initial selection when dataset loads
   useEffect(() => {
     if (dataset?.fitFiles) {
       setSelectedFileIds(dataset.fitFiles.map(f => f.id));
@@ -117,14 +115,31 @@ export default function DatasetView() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{dataset.name}</h1>
-        <Link href="/dashboard">
-          <Button variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+        <h1 className="text-2xl font-bold">{dataset?.name}</h1>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setEditModalOpen(true)}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Edit Dataset
           </Button>
-        </Link>
+          <Link href="/dashboard">
+            <Button variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      {dataset && (
+        <DatasetEditModal 
+          open={editModalOpen} 
+          onOpenChange={setEditModalOpen}
+          dataset={dataset}
+        />
+      )}
 
       <Card>
         <CardHeader>
