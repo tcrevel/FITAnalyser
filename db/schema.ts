@@ -19,7 +19,9 @@ export const datasets = pgTable("datasets", {
 export const fitFiles = pgTable("fit_files", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  datasetId: integer("dataset_id").references(() => datasets.id).notNull(),
+  datasetId: integer("dataset_id")
+    .references(() => datasets.id, { onDelete: 'cascade' })
+    .notNull(),
   filePath: text("file_path").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
