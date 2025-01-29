@@ -2,18 +2,13 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SiFirebase } from "react-icons/si";
-import { LayoutDashboard, Settings, Users } from "lucide-react";
+import { LayoutDashboard, Settings } from "lucide-react";
 
 const sidebarNavItems = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/dashboard",
-  },
-  {
-    title: "Users",
-    icon: Users,
-    href: "/dashboard/users",
   },
   {
     title: "Settings",
