@@ -10,7 +10,6 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import DatasetView from "@/pages/dataset-view";
-import Settings from "@/pages/settings";
 import { ProtectedRoute } from "@/components/protected-route";
 
 function Router() {
@@ -20,11 +19,6 @@ function Router() {
       <Route path="/dashboard/dataset/:id">
         <ProtectedRoute>
           <DatasetView />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/settings">
-        <ProtectedRoute>
-          <Settings />
         </ProtectedRoute>
       </Route>
       <Route path="/dashboard">

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SiFirebase } from "react-icons/si";
 import { LayoutDashboard, Settings } from "lucide-react";
+import { SettingsModal } from "./settings-modal";
 
 const sidebarNavItems = [
   {
@@ -10,14 +12,11 @@ const sidebarNavItems = [
     icon: LayoutDashboard,
     href: "/dashboard",
   },
-  {
-    title: "Settings",
-    icon: Settings,
-    href: "/settings",
-  },
 ];
 
 export function Sidebar() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
     <div className="flex h-screen flex-col border-r">
       <div className="flex h-14 items-center border-b px-4">
@@ -41,8 +40,17 @@ export function Sidebar() {
               </Link>
             </Button>
           ))}
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Button>
         </div>
       </ScrollArea>
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }
