@@ -113,7 +113,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
 
     const fitParser = new FitParser({
       force: true,
-      speedUnit: 'km/h',
+      speedUnit: 'km/h', // Changed from default to ensure consistent units
       lengthUnit: 'km',
       elapsedRecordField: true,
     });
@@ -136,8 +136,8 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       power: record.power || 0,
       cadence: record.cadence || 0,
       heartRate: record.heart_rate || 0,
-      // Convert m/s to km/h with validation
-      speed: record.speed ? Math.min(Math.max(record.speed * 3.6, 0), 100) : 0, // Cap speed at 100 km/h
+      // Speed is already in km/h from parser configuration
+      speed: record.speed ? Math.min(Math.max(record.speed, 0), 100) : 0,
       // Ensure altitude is in meters and within reasonable range (-500m to 9000m)
       altitude: record.altitude ? Math.min(Math.max(record.altitude, -500), 9000) : 0,
       timestamp: record.timestamp,
