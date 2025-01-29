@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricGraph } from "@/components/dashboard/metric-graph";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useState, useEffect } from "react";
 
 type FitFile = {
   id: number;
@@ -32,6 +35,7 @@ type ProcessedDataSet = {
 export default function DatasetView() {
   const [, params] = useRoute("/dashboard/dataset/:id");
   const id = params?.id;
+  const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
 
   // Get all available datasets
   const { data: files = [], isLoading: isLoadingFiles } = useQuery<FitFile[]>({
@@ -39,21 +43,31 @@ export default function DatasetView() {
     queryFn: () => fetch("/api/fit-files").then(res => res.json()),
   });
 
-  // Get data for all files
+  // Set initial selection when files load
+  useEffect(() => {
+    if (id && !selectedFileIds.includes(parseInt(id))) {
+      setSelectedFileIds([parseInt(id)]);
+    }
+  }, [id, files]);
+
+  // Get data only for selected files
   const { data: datasets = [], isLoading: isLoadingData } = useQuery<ProcessedDataSet[]>({
-    queryKey: ["fit-files-data", files.map(f => f.id)],
+    queryKey: ["fit-files-data", selectedFileIds],
     queryFn: async () => {
-      const dataPromises = files.map(async file => {
-        const response = await fetch(`/api/fit-files/${file.id}/data`);
+      const dataPromises = selectedFileIds.map(async fileId => {
+        const file = files.find(f => f.id === fileId);
+        if (!file) return null;
+        const response = await fetch(`/api/fit-files/${fileId}/data`);
         const data = await response.json();
         return {
           name: file.name,
           data,
         };
       });
-      return Promise.all(dataPromises);
+      const results = await Promise.all(dataPromises);
+      return results.filter((result): result is ProcessedDataSet => result !== null);
     },
-    enabled: files.length > 0,
+    enabled: selectedFileIds.length > 0 && files.length > 0,
   });
 
   const isLoading = isLoadingFiles || isLoadingData;
@@ -87,6 +101,15 @@ export default function DatasetView() {
   // Find the current dataset
   const currentDataset = files.find(f => f.id === parseInt(id || ""));
 
+  const handleFileSelection = (fileId: number) => {
+    setSelectedFileIds(prev => {
+      if (prev.includes(fileId)) {
+        return prev.filter(id => id !== fileId);
+      }
+      return [...prev, fileId];
+    });
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -103,17 +126,21 @@ export default function DatasetView() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Datasets Being Compared</CardTitle>
+          <CardTitle>Select Datasets to Compare</CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-2">
-            {datasets.map(dataset => (
-              <li key={dataset.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-primary" />
-                <span>{dataset.name}</span>
-              </li>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {files.map(file => (
+              <div key={file.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`file-${file.id}`}
+                  checked={selectedFileIds.includes(file.id)}
+                  onCheckedChange={() => handleFileSelection(file.id)}
+                />
+                <Label htmlFor={`file-${file.id}`}>{file.name}</Label>
+              </div>
             ))}
-          </ul>
+          </div>
         </CardContent>
       </Card>
 
