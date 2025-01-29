@@ -15,15 +15,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription,
+  DialogFooter,
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
 import { DatasetEditModal } from "./dataset-edit-modal";
 
 type Dataset = {
-  id: number;
+  id: string;
   name: string;
   createdAt: string;
   fitFiles: Array<{
-    id: number;
+    id: string;
     name: string;
     filePath: string;
   }>;
@@ -40,7 +48,7 @@ async function uploadDataset(formData: FormData) {
   return response.json();
 }
 
-async function deleteDataset(id: number) {
+async function deleteDataset(id: string) {
   const response = await fetch(`/api/fit-files/${id}`, {
     method: "DELETE",
   });
@@ -56,7 +64,7 @@ export function FitFilesGrid() {
   const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [datasetToDelete, setDatasetToDelete] = useState<number | null>(null);
+  const [datasetToDelete, setDatasetToDelete] = useState<string | null>(null);
 
   const { data: datasets = [], isLoading } = useQuery<Dataset[]>({
     queryKey: ["datasets"],
@@ -77,6 +85,7 @@ export function FitFilesGrid() {
         title: "Success",
         description: "Files uploaded successfully",
       });
+      setUploadDialogOpen(false);
       // Navigate to the dataset view
       if (data?.id) {
         setLocation(`/dashboard/dataset/${data.id}`);
@@ -132,7 +141,7 @@ export function FitFilesGrid() {
     form.reset();
   };
 
-  const handleDeleteClick = (id: number) => {
+  const handleDeleteClick = (id: string) => {
     setDatasetToDelete(id);
     setDeleteDialogOpen(true);
   };

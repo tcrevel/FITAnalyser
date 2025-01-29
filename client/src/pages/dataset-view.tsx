@@ -11,13 +11,13 @@ import { useState, useEffect } from "react";
 import { DatasetEditModal } from "@/components/dashboard/dataset-edit-modal";
 
 type FitFile = {
-  id: number;
+  id: string;
   name: string;
   filePath: string;
 };
 
 type Dataset = {
-  id: number;
+  id: string;
   name: string;
   createdAt: string;
   fitFiles: FitFile[];
@@ -41,7 +41,7 @@ type ProcessedDataSet = {
 export default function DatasetView() {
   const [, params] = useRoute("/dashboard/dataset/:id");
   const id = params?.id;
-  const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   const { data: dataset, isLoading: isLoadingDataset } = useQuery<Dataset>({
@@ -103,7 +103,7 @@ export default function DatasetView() {
     );
   }
 
-  const handleFileSelection = (fileId: number) => {
+  const handleFileSelection = (fileId: string) => {
     setSelectedFileIds(prev => {
       if (prev.includes(fileId)) {
         return prev.filter(id => id !== fileId);
