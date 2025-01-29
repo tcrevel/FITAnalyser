@@ -7,7 +7,6 @@ import path from "path";
 import type { Request, Response } from "express";
 import { requireAuth } from "../middleware/auth";
 import fs from "fs";
-import FitParser from "fit-file-parser";
 import { promisify } from "util";
 
 // Define types for authenticated request
@@ -102,6 +101,9 @@ router.get("/:id/data", async (req: AuthenticatedRequest, res: Response) => {
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
 
+    // Dynamically import the fit-file-parser package
+    const { default: FitParser } = await import('fit-file-parser');
+
     const fitParser = new FitParser({
       force: true,
       speedUnit: 'km/h',
@@ -109,31 +111,39 @@ router.get("/:id/data", async (req: AuthenticatedRequest, res: Response) => {
       elapsedRecordField: true,
     });
 
-    const data = await new Promise((resolve, reject) => {
+    const parsedData: any = await new Promise((resolve, reject) => {
       fitParser.parse(buffer, (error: Error, data: any) => {
         if (error) {
+          console.error("FIT parse error:", error);
           reject(error);
         } else {
+          console.log("Successfully parsed FIT data");
           resolve(data);
         }
       });
     });
 
-    const records = data.records || [];
+    console.log("Parsed FIT data structure:", Object.keys(parsedData));
+
+    const records = parsedData.records || [];
+    console.log("Number of records:", records.length);
+    console.log("Sample record:", records[0]);
+
     const processedData = records.map((record: any, index: number) => ({
       index,
-      power: record.power,
-      cadence: record.cadence,
-      heartRate: record.heart_rate,
-      speed: record.speed,
-      altitude: record.altitude,
+      power: record.power || 0,
+      cadence: record.cadence || 0,
+      heartRate: record.heart_rate || 0,
+      speed: (record.speed || 0) * 3.6, // Convert m/s to km/h
+      altitude: record.altitude || 0,
       timestamp: record.timestamp,
     }));
 
+    console.log("First processed record:", processedData[0]);
     res.json(processedData);
   } catch (error) {
     console.error("Error parsing fit file:", error);
-    res.status(500).json({ error: "Failed to parse fit file" });
+    res.status(500).json({ error: `Failed to parse fit file: ${error.message}` });
   }
 });
 
@@ -171,13 +181,29 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 // Delete a fit file
 router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const file = await db.query.fitFiles.findFirst({
+      where: eq(fitFiles.id, parseInt(req.params.id)),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Verify the user owns this file
+    if (file.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    // Delete the physical file
+    try {
+      await fs.promises.unlink(file.filePath);
+    } catch (error) {
+      console.error("Error deleting file from disk:", error);
+    }
+
     const result = await db.delete(fitFiles)
       .where(eq(fitFiles.id, parseInt(req.params.id)))
       .returning();
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: "File not found" });
-    }
 
     res.json({ message: "File deleted successfully" });
   } catch (error) {
