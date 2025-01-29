@@ -20,6 +20,7 @@ import { Eye, Plus, Trash2, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 type FitFile = {
   id: number;
@@ -51,6 +52,7 @@ async function deleteFitFile(id: number) {
 
 export function FitFilesGrid() {
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const { data: files = [], isLoading } = useQuery<FitFile[]>({
     queryKey: ["fit-files"],
@@ -59,12 +61,16 @@ export function FitFilesGrid() {
 
   const uploadMutation = useMutation({
     mutationFn: uploadFitFiles,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["fit-files"] });
       toast({
         title: "Success",
         description: "Files uploaded successfully",
       });
+      // Navigate to the first uploaded dataset
+      if (Array.isArray(data) && data.length > 0) {
+        setLocation(`/dashboard/dataset/${data[0].id}`);
+      }
     },
     onError: () => {
       toast({
@@ -101,12 +107,12 @@ export function FitFilesGrid() {
     const fileInput = form.querySelector<HTMLInputElement>('input[type="file"]');
     const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]');
 
-    if (fileInput?.files) {
+    if (fileInput?.files && fileInput.files.length > 0) {
       Array.from(fileInput.files).forEach((file, index) => {
         formData.append('files', file);
         // If multiple files, append index to name
         const baseName = nameInput?.value || 'Dataset';
-        const name = fileInput.files.length > 1 ? `${baseName} ${index + 1}` : baseName;
+        const name = fileInput.files && fileInput.files.length > 1 ? `${baseName} ${index + 1}` : baseName;
         formData.append('names[]', name);
       });
     }
@@ -204,10 +210,7 @@ export function FitFilesGrid() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          // TODO: Implement view action
-                          console.log("View file:", file.id);
-                        }}
+                        onClick={() => setLocation(`/dashboard/dataset/${file.id}`)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>

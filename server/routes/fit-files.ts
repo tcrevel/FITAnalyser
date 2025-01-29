@@ -58,6 +58,29 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// Get a single fit file by ID
+router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const file = await db.query.fitFiles.findFirst({
+      where: eq(fitFiles.id, parseInt(req.params.id)),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Verify the user owns this file
+    if (file.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    res.json(file);
+  } catch (error) {
+    console.error("Error fetching fit file:", error);
+    res.status(500).json({ error: "Failed to fetch fit file" });
+  }
+});
+
 // Upload multiple fit files
 router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: Response) => {
   try {

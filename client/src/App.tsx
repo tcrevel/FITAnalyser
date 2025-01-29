@@ -9,12 +9,18 @@ import { onAuthStateChanged } from "firebase/auth";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
+import DatasetView from "@/pages/dataset-view";
 import { ProtectedRoute } from "@/components/protected-route";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/dashboard/dataset/:id">
+        <ProtectedRoute>
+          <DatasetView />
+        </ProtectedRoute>
+      </Route>
       <Route path="/dashboard">
         <ProtectedRoute>
           <Dashboard />
