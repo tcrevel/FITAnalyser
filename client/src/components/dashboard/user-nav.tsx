@@ -39,9 +39,6 @@ export function UserNav() {
           </div>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setLocation("/settings")}>
-          Settings
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleSignOut}>
           Log out
         </DropdownMenuItem>

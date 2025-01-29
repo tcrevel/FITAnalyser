@@ -13,7 +13,7 @@ const sidebarNavItems = [
   {
     title: "Settings",
     icon: Settings,
-    href: "/dashboard/settings",
+    href: "/settings",
   },
 ];
 
