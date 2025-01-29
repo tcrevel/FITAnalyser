@@ -138,8 +138,12 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       heartRate: record.heart_rate || 0,
       // Speed is already in km/h from parser configuration
       speed: record.speed ? Math.min(Math.max(record.speed, 0), 100) : 0,
-      // Ensure altitude is in meters and within reasonable range (-500m to 9000m)
-      altitude: record.enhanced_altitude || record.altitude || 0,
+      // Convert altitude to meters and ensure it's within reasonable range
+      altitude: record.enhanced_altitude 
+        ? Math.round(record.enhanced_altitude * 1000) // Convert to meters if in kilometers
+        : record.altitude
+          ? Math.round(record.altitude * 1000) 
+          : 0,
       timestamp: record.timestamp,
     }));
 
