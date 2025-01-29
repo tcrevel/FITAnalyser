@@ -8,18 +8,46 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceArea,
+  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+type DataPoint = {
+  index: number;
+  power: number;
+  cadence: number;
+  heartRate: number;
+  speed: number;
+  altitude: number;
+  timestamp: string;
+};
+
+type Dataset = {
+  name: string;
+  data: DataPoint[];
+};
+
 interface MetricGraphProps {
-  data: any[];
-  metricKey: string;
+  datasets: Dataset[];
+  metricKey: keyof DataPoint;
   title: string;
   color: string;
   unit: string;
 }
 
-export function MetricGraph({ data, metricKey, title, color, unit }: MetricGraphProps) {
+// Generate a color palette for multiple datasets
+const colors = [
+  "#ef4444", // Red
+  "#3b82f6", // Blue
+  "#10b981", // Green
+  "#8b5cf6", // Purple
+  "#f59e0b", // Yellow
+  "#ec4899", // Pink
+  "#6366f1", // Indigo
+  "#14b8a6", // Teal
+];
+
+export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphProps) {
   const [refAreaLeft, setRefAreaLeft] = useState("");
   const [refAreaRight, setRefAreaRight] = useState("");
   const [left, setLeft] = useState<number | "dataMin">("dataMin");
@@ -41,12 +69,15 @@ export function MetricGraph({ data, metricKey, title, color, unit }: MetricGraph
       [leftNum, rightNum] = [rightNum, leftNum];
     }
 
-    const dataInRange = data.filter(
-      (_, index) => index >= leftNum && index <= rightNum
+    // Find min and max values across all datasets in the selected range
+    const allValues = datasets.flatMap(dataset => 
+      dataset.data
+        .filter((_, index) => index >= leftNum && index <= rightNum)
+        .map(d => d[metricKey])
     );
 
-    const maxValue = Math.max(...dataInRange.map((d) => d[metricKey]));
-    const minValue = Math.min(...dataInRange.map((d) => d[metricKey]));
+    const maxValue = Math.max(...allValues);
+    const minValue = Math.min(...allValues);
 
     setRefAreaLeft("");
     setRefAreaRight("");
@@ -80,7 +111,6 @@ export function MetricGraph({ data, metricKey, title, color, unit }: MetricGraph
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={data}
               onMouseDown={(e) => e && setRefAreaLeft(e.activeLabel || "")}
               onMouseMove={(e) =>
                 refAreaLeft && e && setRefAreaRight(e.activeLabel || "")
@@ -101,20 +131,31 @@ export function MetricGraph({ data, metricKey, title, color, unit }: MetricGraph
                 type="number"
                 label={{ value: unit, angle: -90, position: "insideLeft" }}
               />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey={metricKey}
-                stroke={color}
-                dot={false}
-                isAnimationActive={false}
+              <Tooltip
+                formatter={(value: number, name: string) => [
+                  `${value} ${unit}`,
+                  name,
+                ]}
               />
+              <Legend />
+              {datasets.map((dataset, index) => (
+                <Line
+                  key={dataset.name}
+                  data={dataset.data}
+                  type="monotone"
+                  name={dataset.name}
+                  dataKey={metricKey}
+                  stroke={colors[index % colors.length]}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              ))}
               {refAreaLeft && refAreaRight ? (
                 <ReferenceArea
                   x1={refAreaLeft}
                   x2={refAreaRight}
                   strokeOpacity={0.3}
-                  fill={color}
+                  fill="#8884d8"
                   fillOpacity={0.3}
                 />
               ) : null}

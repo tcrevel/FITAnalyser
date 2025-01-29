@@ -24,23 +24,39 @@ type DataPoint = {
   timestamp: string;
 };
 
+type ProcessedDataSet = {
+  name: string;
+  data: DataPoint[];
+};
+
 export default function DatasetView() {
   const [, params] = useRoute("/dashboard/dataset/:id");
   const id = params?.id;
 
-  const { data: dataset, isLoading: isLoadingDataset } = useQuery<FitFile>({
-    queryKey: ["fit-files", id],
-    queryFn: () => fetch(`/api/fit-files/${id}`).then(res => res.json()),
-    enabled: !!id,
+  // Get all available datasets
+  const { data: files = [], isLoading: isLoadingFiles } = useQuery<FitFile[]>({
+    queryKey: ["fit-files"],
+    queryFn: () => fetch("/api/fit-files").then(res => res.json()),
   });
 
-  const { data: fitData, isLoading: isLoadingData } = useQuery<DataPoint[]>({
-    queryKey: ["fit-files", id, "data"],
-    queryFn: () => fetch(`/api/fit-files/${id}/data`).then(res => res.json()),
-    enabled: !!id,
+  // Get data for all files
+  const { data: datasets = [], isLoading: isLoadingData } = useQuery<ProcessedDataSet[]>({
+    queryKey: ["fit-files-data", files.map(f => f.id)],
+    queryFn: async () => {
+      const dataPromises = files.map(async file => {
+        const response = await fetch(`/api/fit-files/${file.id}/data`);
+        const data = await response.json();
+        return {
+          name: file.name,
+          data,
+        };
+      });
+      return Promise.all(dataPromises);
+    },
+    enabled: files.length > 0,
   });
 
-  const isLoading = isLoadingDataset || isLoadingData;
+  const isLoading = isLoadingFiles || isLoadingData;
 
   if (isLoading) {
     return (
@@ -54,10 +70,10 @@ export default function DatasetView() {
     );
   }
 
-  if (!dataset || !fitData) {
+  if (files.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Dataset not found</h1>
+        <h1 className="text-2xl font-bold mb-4">No datasets found</h1>
         <Link href="/dashboard">
           <Button>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -68,10 +84,15 @@ export default function DatasetView() {
     );
   }
 
+  // Find the current dataset
+  const currentDataset = files.find(f => f.id === parseInt(id || ""));
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{dataset.name}</h1>
+        <h1 className="text-2xl font-bold">
+          {currentDataset ? currentDataset.name : 'Dataset Comparison'}
+        </h1>
         <Link href="/dashboard">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -82,62 +103,57 @@ export default function DatasetView() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Dataset Information</CardTitle>
+          <CardTitle>Datasets Being Compared</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Created</p>
-            <p>{format(new Date(dataset.createdAt), "PPP p")}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">File Path</p>
-            <p className="font-mono text-sm">{dataset.filePath}</p>
-          </div>
+        <CardContent>
+          <ul className="space-y-2">
+            {datasets.map(dataset => (
+              <li key={dataset.name} className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-primary" />
+                <span>{dataset.name}</span>
+              </li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
 
       <div className="grid gap-6">
-        {/* Power Graph */}
         <MetricGraph
-          data={fitData}
+          datasets={datasets}
           metricKey="power"
-          title="Power"
+          title="Power Comparison"
           color="#ef4444"
           unit="watts"
         />
 
-        {/* Heart Rate Graph */}
         <MetricGraph
-          data={fitData}
+          datasets={datasets}
           metricKey="heartRate"
-          title="Heart Rate"
+          title="Heart Rate Comparison"
           color="#ec4899"
           unit="bpm"
         />
 
-        {/* Speed Graph */}
         <MetricGraph
-          data={fitData}
+          datasets={datasets}
           metricKey="speed"
-          title="Speed"
+          title="Speed Comparison"
           color="#3b82f6"
           unit="km/h"
         />
 
-        {/* Cadence Graph */}
         <MetricGraph
-          data={fitData}
+          datasets={datasets}
           metricKey="cadence"
-          title="Cadence"
+          title="Cadence Comparison"
           color="#10b981"
           unit="rpm"
         />
 
-        {/* Elevation Graph */}
         <MetricGraph
-          data={fitData}
+          datasets={datasets}
           metricKey="altitude"
-          title="Elevation"
+          title="Elevation Comparison"
           color="#8b5cf6"
           unit="m"
         />
