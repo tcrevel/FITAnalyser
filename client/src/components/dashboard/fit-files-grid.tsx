@@ -13,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +23,7 @@ import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { useState } from "react";
 
 type Dataset = {
   id: number;
@@ -57,6 +60,8 @@ async function deleteDataset(id: number) {
 export function FitFilesGrid() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [datasetToDelete, setDatasetToDelete] = useState<number | null>(null);
 
   const { data: datasets = [], isLoading } = useQuery<Dataset[]>({
     queryKey: ["datasets"],
@@ -99,6 +104,8 @@ export function FitFilesGrid() {
         title: "Success",
         description: "Dataset deleted successfully",
       });
+      setDeleteDialogOpen(false);
+      setDatasetToDelete(null);
     },
     onError: () => {
       toast({
@@ -106,6 +113,8 @@ export function FitFilesGrid() {
         description: "Failed to delete dataset",
         variant: "destructive",
       });
+      setDeleteDialogOpen(false);
+      setDatasetToDelete(null);
     },
   });
 
@@ -128,9 +137,14 @@ export function FitFilesGrid() {
     form.reset();
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm("Are you sure you want to delete this dataset and all its files?")) {
-      await deleteMutation.mutateAsync(id);
+  const handleDeleteClick = (id: number) => {
+    setDatasetToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (datasetToDelete !== null) {
+      await deleteMutation.mutateAsync(datasetToDelete);
     }
   };
 
@@ -226,7 +240,7 @@ export function FitFilesGrid() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(dataset.id)}
+                        onClick={() => handleDeleteClick(dataset.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -238,6 +252,36 @@ export function FitFilesGrid() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Dataset</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this dataset and all its files? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDatasetToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
