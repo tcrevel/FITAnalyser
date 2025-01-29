@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import type { Request, Response } from "express";
+import { requireAuth } from "../middleware/auth";
+import fs from "fs";
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
@@ -15,9 +17,13 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(process.cwd(), "uploads", "fit-files");
+fs.mkdirSync(uploadsDir, { recursive: true });
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: "uploads/fit-files",
+  destination: uploadsDir,
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
@@ -34,6 +40,9 @@ const upload = multer({
     }
   },
 });
+
+// Apply auth middleware to all routes
+router.use(requireAuth);
 
 // Get all fit files for the current user
 router.get("/", async (req: AuthenticatedRequest, res: Response) => {
