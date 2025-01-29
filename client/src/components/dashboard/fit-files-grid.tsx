@@ -28,13 +28,13 @@ type FitFile = {
   filePath: string;
 };
 
-async function uploadFitFile(formData: FormData) {
+async function uploadFitFiles(formData: FormData) {
   const response = await fetch("/api/fit-files", {
     method: "POST",
     body: formData,
   });
   if (!response.ok) {
-    throw new Error("Failed to upload file");
+    throw new Error("Failed to upload files");
   }
   return response.json();
 }
@@ -58,18 +58,18 @@ export function FitFilesGrid() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: uploadFitFile,
+    mutationFn: uploadFitFiles,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fit-files"] });
       toast({
         title: "Success",
-        description: "File uploaded successfully",
+        description: "Files uploaded successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to upload file",
+        description: "Failed to upload files",
         variant: "destructive",
       });
     },
@@ -96,7 +96,21 @@ export function FitFilesGrid() {
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const formData = new FormData(form);
+    const formData = new FormData();
+
+    const fileInput = form.querySelector<HTMLInputElement>('input[type="file"]');
+    const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]');
+
+    if (fileInput?.files) {
+      Array.from(fileInput.files).forEach((file, index) => {
+        formData.append('files', file);
+        // If multiple files, append index to name
+        const baseName = nameInput?.value || 'Dataset';
+        const name = fileInput.files.length > 1 ? `${baseName} ${index + 1}` : baseName;
+        formData.append('names[]', name);
+      });
+    }
+
     await uploadMutation.mutateAsync(formData);
     form.reset();
   };
@@ -115,31 +129,41 @@ export function FitFilesGrid() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Add Dataset
+              Add Datasets
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upload FIT File</DialogTitle>
+              <DialogTitle>Upload FIT Files</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleUpload} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Dataset Name</Label>
-                <Input id="name" name="name" required />
+                <Input 
+                  id="name" 
+                  name="name" 
+                  required 
+                  placeholder="For multiple files, this will be the base name"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="file">FIT File</Label>
+                <Label htmlFor="file">FIT Files</Label>
                 <Input
                   id="file"
                   name="file"
                   type="file"
                   accept=".fit"
                   required
+                  multiple
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold hover:file:bg-violet-100 file:bg-violet-50 file:text-violet-700"
                 />
+                <p className="text-sm text-muted-foreground">
+                  You can select multiple .fit files
+                </p>
               </div>
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full" disabled={uploadMutation.isPending}>
                 <Upload className="h-4 w-4 mr-2" />
-                Upload
+                {uploadMutation.isPending ? "Uploading..." : "Upload"}
               </Button>
             </form>
           </DialogContent>

@@ -58,23 +58,34 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Upload a new fit file
-router.post("/", upload.single("file"), async (req: AuthenticatedRequest, res: Response) => {
+// Upload multiple fit files
+router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
     }
 
-    const newFile = await db.insert(fitFiles).values({
-      name: req.body.name || req.file.originalname,
-      userId: req.user.id,
-      filePath: req.file.path,
-    }).returning();
+    const names = req.body['names[]'] || [];
+    const namesArray = Array.isArray(names) ? names : [names];
 
-    res.status(201).json(newFile[0]);
+    const insertedFiles = await Promise.all(
+      req.files.map(async (file, index) => {
+        const name = namesArray[index] || file.originalname;
+        const [newFile] = await db.insert(fitFiles)
+          .values({
+            name,
+            userId: req.user.id,
+            filePath: file.path,
+          })
+          .returning();
+        return newFile;
+      })
+    );
+
+    res.status(201).json(insertedFiles);
   } catch (error) {
-    console.error("Error uploading fit file:", error);
-    res.status(500).json({ error: "Failed to upload fit file" });
+    console.error("Error uploading fit files:", error);
+    res.status(500).json({ error: "Failed to upload fit files" });
   }
 });
 
