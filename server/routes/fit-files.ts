@@ -7,6 +7,8 @@ import path from "path";
 import type { Request, Response } from "express";
 import { requireAuth } from "../middleware/auth";
 import fs from "fs";
+import FitParser from "fit-file-parser";
+import { promisify } from "util";
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
@@ -78,6 +80,60 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   } catch (error) {
     console.error("Error fetching fit file:", error);
     res.status(500).json({ error: "Failed to fetch fit file" });
+  }
+});
+
+// Get the parsed data from a fit file
+router.get("/:id/data", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const file = await db.query.fitFiles.findFirst({
+      where: eq(fitFiles.id, parseInt(req.params.id)),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Verify the user owns this file
+    if (file.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    const readFile = promisify(fs.readFile);
+    const buffer = await readFile(file.filePath);
+
+    const fitParser = new FitParser({
+      force: true,
+      speedUnit: 'km/h',
+      lengthUnit: 'km',
+      elapsedRecordField: true,
+    });
+
+    const data = await new Promise((resolve, reject) => {
+      fitParser.parse(buffer, (error: Error, data: any) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+
+    const records = data.records || [];
+    const processedData = records.map((record: any, index: number) => ({
+      index,
+      power: record.power,
+      cadence: record.cadence,
+      heartRate: record.heart_rate,
+      speed: record.speed,
+      altitude: record.altitude,
+      timestamp: record.timestamp,
+    }));
+
+    res.json(processedData);
+  } catch (error) {
+    console.error("Error parsing fit file:", error);
+    res.status(500).json({ error: "Failed to parse fit file" });
   }
 });
 

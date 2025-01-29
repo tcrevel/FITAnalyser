@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricGraph } from "@/components/dashboard/metric-graph";
 
 type FitFile = {
   id: number;
@@ -13,15 +14,33 @@ type FitFile = {
   filePath: string;
 };
 
+type DataPoint = {
+  index: number;
+  power: number;
+  cadence: number;
+  heartRate: number;
+  speed: number;
+  altitude: number;
+  timestamp: string;
+};
+
 export default function DatasetView() {
   const [, params] = useRoute("/dashboard/dataset/:id");
   const id = params?.id;
 
-  const { data: dataset, isLoading } = useQuery<FitFile>({
+  const { data: dataset, isLoading: isLoadingDataset } = useQuery<FitFile>({
     queryKey: ["fit-files", id],
     queryFn: () => fetch(`/api/fit-files/${id}`).then(res => res.json()),
     enabled: !!id,
   });
+
+  const { data: fitData, isLoading: isLoadingData } = useQuery<DataPoint[]>({
+    queryKey: ["fit-files", id, "data"],
+    queryFn: () => fetch(`/api/fit-files/${id}/data`).then(res => res.json()),
+    enabled: !!id,
+  });
+
+  const isLoading = isLoadingDataset || isLoadingData;
 
   if (isLoading) {
     return (
@@ -35,7 +54,7 @@ export default function DatasetView() {
     );
   }
 
-  if (!dataset) {
+  if (!dataset || !fitData) {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Dataset not found</h1>
@@ -61,24 +80,67 @@ export default function DatasetView() {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dataset Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Created</p>
-              <p>{format(new Date(dataset.createdAt), "PPP p")}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">File Path</p>
-              <p className="font-mono text-sm">{dataset.filePath}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Dataset Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Created</p>
+            <p>{format(new Date(dataset.createdAt), "PPP p")}</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">File Path</p>
+            <p className="font-mono text-sm">{dataset.filePath}</p>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* TODO: Add more cards for dataset analysis and visualization */}
+      <div className="grid gap-6">
+        {/* Power Graph */}
+        <MetricGraph
+          data={fitData}
+          metricKey="power"
+          title="Power"
+          color="#ef4444"
+          unit="watts"
+        />
+
+        {/* Heart Rate Graph */}
+        <MetricGraph
+          data={fitData}
+          metricKey="heartRate"
+          title="Heart Rate"
+          color="#ec4899"
+          unit="bpm"
+        />
+
+        {/* Speed Graph */}
+        <MetricGraph
+          data={fitData}
+          metricKey="speed"
+          title="Speed"
+          color="#3b82f6"
+          unit="km/h"
+        />
+
+        {/* Cadence Graph */}
+        <MetricGraph
+          data={fitData}
+          metricKey="cadence"
+          title="Cadence"
+          color="#10b981"
+          unit="rpm"
+        />
+
+        {/* Elevation Graph */}
+        <MetricGraph
+          data={fitData}
+          metricKey="altitude"
+          title="Elevation"
+          color="#8b5cf6"
+          unit="m"
+        />
       </div>
     </div>
   );
