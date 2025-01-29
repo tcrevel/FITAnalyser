@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { Trash2 } from "lucide-react";
 import {
@@ -100,14 +101,14 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="max-w-[425px] p-6">
+        <DialogHeader className="space-y-3">
           <DialogTitle>Edit Dataset</DialogTitle>
           <DialogDescription>
             Update dataset name and manage uploaded files.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="space-y-6 py-4">
           <div className="space-y-2">
             <Label htmlFor="name">Dataset Name</Label>
             <Input
@@ -115,52 +116,55 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter dataset name"
+              className="w-full"
             />
           </div>
           <div className="space-y-2">
             <Label>Uploaded Files</Label>
-            <div className="space-y-2">
-              {dataset.fitFiles.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center justify-between rounded-md border p-2"
-                >
-                  <span className="text-sm">{file.name}</span>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete File</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete this file? This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteFile(file.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              ))}
-            </div>
+            <ScrollArea className="h-[200px] rounded-md border p-2">
+              <div className="space-y-2">
+                {dataset.fitFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center justify-between rounded-md border p-2 hover:bg-accent"
+                  >
+                    <span className="text-sm truncate flex-1 mr-2">{file.name}</span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete File</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this file? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteFile(file.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleUpdateDataset} disabled={isUpdating}>
-            {isUpdating ? "Updating..." : "Save Changes"}
+            {isUpdating ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </DialogContent>
