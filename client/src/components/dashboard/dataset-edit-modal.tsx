@@ -58,7 +58,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to update dataset");
       }
 
-      await queryClient.invalidateQueries(["datasets"]);
+      await queryClient.invalidateQueries({ queryKey: ["datasets"] });
       toast({
         title: "Success",
         description: "Dataset updated successfully",
@@ -85,7 +85,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to delete file");
       }
 
-      await queryClient.invalidateQueries(["datasets"]);
+      await queryClient.invalidateQueries({ queryKey: ["datasets"] });
       toast({
         title: "Success",
         description: "File deleted successfully",
@@ -101,71 +101,76 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[425px] p-6">
-        <DialogHeader className="space-y-3">
-          <DialogTitle>Edit Dataset</DialogTitle>
-          <DialogDescription>
-            Update dataset name and manage uploaded files.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Dataset Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter dataset name"
-              className="w-full"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Uploaded Files</Label>
-            <ScrollArea className="h-[200px] rounded-md border p-2">
+      <DialogContent>
+        <div className="flex flex-col h-[80vh] max-h-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Dataset</DialogTitle>
+            <DialogDescription>
+              Update dataset name and manage uploaded files.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 px-1">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                {dataset.fitFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between rounded-md border p-2 hover:bg-accent"
-                  >
-                    <span className="text-sm truncate flex-1 mr-2">{file.name}</span>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete File</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this file? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteFile(file.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                ))}
+                <Label htmlFor="name">Dataset Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter dataset name"
+                />
               </div>
-            </ScrollArea>
+              <div className="space-y-2">
+                <Label>Uploaded Files</Label>
+                <div className="rounded-md border">
+                  <div className="p-2 space-y-2">
+                    {dataset.fitFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between rounded-md border p-2 hover:bg-accent"
+                      >
+                        <span className="text-sm truncate flex-1 mr-2">{file.name}</span>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete File</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this file? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteFile(file.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateDataset} disabled={isUpdating}>
+              {isUpdating ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
-        </div>
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleUpdateDataset} disabled={isUpdating}>
-            {isUpdating ? "Saving..." : "Save Changes"}
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
