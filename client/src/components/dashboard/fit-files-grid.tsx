@@ -60,7 +60,13 @@ export function FitFilesGrid() {
 
   const { data: datasets = [], isLoading } = useQuery<Dataset[]>({
     queryKey: ["datasets"],
-    queryFn: () => fetch("/api/fit-files").then(res => res.json()),
+    queryFn: async () => {
+      const response = await fetch("/api/fit-files");
+      if (!response.ok) {
+        throw new Error("Failed to fetch datasets");
+      }
+      return response.json();
+    },
   });
 
   const uploadMutation = useMutation({
@@ -112,10 +118,10 @@ export function FitFilesGrid() {
     const nameInput = form.querySelector<HTMLInputElement>('input[name="name"]');
 
     if (fileInput?.files && fileInput.files.length > 0) {
-      Array.from(fileInput.files).forEach((file, index) => {
+      Array.from(fileInput.files).forEach(file => {
         formData.append('files', file);
-        formData.append('name', nameInput?.value || 'New Dataset');
       });
+      formData.append('name', nameInput?.value || 'New Dataset');
     }
 
     await uploadMutation.mutateAsync(formData);
