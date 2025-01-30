@@ -70,7 +70,9 @@ export default function DatasetView() {
       if (!response.ok) {
         throw new Error("Failed to fetch dataset");
       }
-      return response.json();
+      const data = await response.json();
+      console.log("Dataset loaded:", data); // Debug log
+      return data;
     },
     enabled: !!id,
   });
@@ -100,6 +102,7 @@ export default function DatasetView() {
         }
 
         const data = await response.json();
+        console.log("File data loaded:", { fileId, data }); // Debug log
         return {
           name: file.name,
           data,
@@ -107,9 +110,11 @@ export default function DatasetView() {
       });
 
       const results = await Promise.all(dataPromises);
-      return results.filter(
+      const filteredResults = results.filter(
         (result): result is ProcessedDataSet => result !== null
       );
+      console.log("Processed dataset:", filteredResults); // Debug log
+      return filteredResults;
     },
     enabled: selectedFileIds.length > 0 && !!dataset,
   });

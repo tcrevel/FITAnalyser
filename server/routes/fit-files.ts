@@ -188,6 +188,8 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
 // Get the parsed data from a fit file for the authenticated user
 router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
+    console.log("Fetching file data for ID:", req.params.id); // Debug log
+
     const file = await db.query.fitFiles.findFirst({
       where: eq(fitFiles.id, req.params.id),
       with: {
@@ -196,14 +198,17 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
     });
 
     if (!file) {
+      console.log("File not found:", req.params.id); // Debug log
       return res.status(404).json({ error: "File not found" });
     }
 
     // Check if the file's dataset belongs to the authenticated user
     if (file.dataset.userId !== req.user.id) {
+      console.log("Unauthorized access attempt:", req.user.id, "trying to access file owned by:", file.dataset.userId); // Debug log
       return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
+    console.log("Reading file from path:", file.filePath); // Debug log
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
     const { default: FitParser } = await import('fit-file-parser');
@@ -221,12 +226,15 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
           console.error("FIT parse error:", error);
           reject(error);
         } else {
+          console.log("FIT file parsed successfully, records:", data.records?.length); // Debug log
           resolve(data);
         }
       });
     });
 
     const records = parsedData.records || [];
+    console.log("Sample record:", records[0]); // Debug log - show first record structure
+
     const processedData = records.map((record: any, index: number) => ({
       index,
       power: record.power || 0,
@@ -241,6 +249,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       timestamp: record.timestamp,
     }));
 
+    console.log("Processed records:", processedData.length, "Sample:", processedData[0]); // Debug log
     res.json(processedData);
   } catch (error: any) {
     console.error("Error parsing fit file:", error);

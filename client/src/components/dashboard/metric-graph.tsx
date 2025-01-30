@@ -48,6 +48,8 @@ const colors = [
 ];
 
 export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphProps) {
+  console.log("MetricGraph render:", { datasets, metricKey, title }); // Debug log
+
   const [refAreaLeft, setRefAreaLeft] = useState("");
   const [refAreaRight, setRefAreaRight] = useState("");
   const [left, setLeft] = useState<number | "dataMin">("dataMin");
@@ -55,7 +57,15 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
   const [top, setTop] = useState<number | "dataMax">("dataMax");
   const [bottom, setBottom] = useState<number | "dataMin">("dataMin");
 
-  const zoom = () => {
+  // Process data for chart
+  const processedData = datasets.flatMap(dataset => {
+    console.log("Processing dataset:", dataset.name, "Data length:", dataset.data?.length); // Debug log
+    return dataset.data || [];
+  });
+
+  console.log("Processed chart data:", processedData); // Debug log
+
+  const zoom = useCallback(() => {
     if (refAreaLeft === refAreaRight || !refAreaRight) {
       setRefAreaLeft("");
       setRefAreaRight("");
@@ -85,7 +95,7 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
     setRight(rightNum);
     setBottom(minValue);
     setTop(maxValue);
-  };
+  }, [datasets, metricKey, refAreaLeft, refAreaRight]);
 
   const zoomOut = () => {
     setLeft("dataMin");
@@ -93,6 +103,22 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
     setTop("dataMax");
     setBottom("dataMin");
   };
+
+  if (!datasets || datasets.length === 0 || !datasets[0]?.data) {
+    console.log("No data available for chart"); // Debug log
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full">
