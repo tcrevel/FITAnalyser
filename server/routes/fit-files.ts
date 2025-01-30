@@ -344,7 +344,10 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
 
     const [updatedDataset] = await db.update(datasets)
       .set({ name: req.body.name })
-      .where(eq(datasets.id, req.params.id))
+      .where(and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ))
       .returning();
 
     res.json(updatedDataset);
@@ -372,7 +375,10 @@ router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
 
     const [updatedDataset] = await db.update(datasets)
       .set({ shareToken })
-      .where(eq(datasets.id, dataset.id))
+      .where(and(
+        eq(datasets.id, dataset.id),
+        eq(datasets.userId, req.user.id)
+      ))
       .returning();
 
     res.json({ shareToken: updatedDataset.shareToken });
