@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { LucideBarChart2, FileHeart, Share2, Download, BarChart3, ChevronRight } from "lucide-react";
+import { LucideBarChart2, FileHeart, Share2, Download, BarChart3, ChevronRight, Database } from "lucide-react";
 
 export default function Landing() {
   return (
@@ -73,6 +73,14 @@ export default function Landing() {
               <h3 className="text-xl font-semibold">Visual Insights</h3>
               <p className="text-muted-foreground">
                 Interactive graphs and charts for detailed workout comparison and analysis.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center text-center p-6 space-y-4 rounded-lg border bg-card">
+              <Database className="h-12 w-12 text-primary" />
+              <h3 className="text-xl font-semibold">Data Management</h3>
+              <p className="text-muted-foreground">
+                Organize your workouts into datasets for efficient comparison and long-term progress tracking.
               </p>
             </div>
           </div>
