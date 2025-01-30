@@ -46,23 +46,7 @@ const upload = multer({
   },
 });
 
-// Type guard for authenticated requests
-function isAuthenticated(req: Request): req is AuthenticatedRequest {
-  return req.user !== undefined;
-}
-
-// Helper function to create typed request handlers
-function createHandler(handler: (req: AuthenticatedRequest, res: Response) => Promise<void>): RequestHandler {
-  return async (req: Request, res: Response) => {
-    if (!isAuthenticated(req)) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    return handler(req, res);
-  };
-}
-
-// Public endpoints for shared datasets
+// Public endpoints (no auth required)
 router.get("/shared/:token", async (req: Request, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
@@ -95,8 +79,11 @@ router.get("/shared/:token", async (req: Request, res: Response) => {
   }
 });
 
-// Rest of the routes with proper typing
-router.get("/", createHandler(async (req, res) => {
+// Apply auth middleware to all authenticated routes
+router.use(requireAuth);
+
+// Get all datasets with their fit files for the authenticated user
+router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userDatasets = await db.query.datasets.findMany({
       where: eq(datasets.userId, req.user.id),
@@ -110,9 +97,10 @@ router.get("/", createHandler(async (req, res) => {
     console.error("Error fetching datasets:", error);
     res.status(500).json({ error: "Failed to fetch datasets" });
   }
-}));
+});
 
-router.get("/:id", createHandler(async (req, res) => {
+// Rest of the routes remain the same, just ensure they use AuthenticatedRequest type
+router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
       where: and(
@@ -133,10 +121,10 @@ router.get("/:id", createHandler(async (req, res) => {
     console.error("Error fetching dataset:", error);
     res.status(500).json({ error: "Failed to fetch dataset" });
   }
-}));
+});
 
 // Get the parsed data from a fit file
-router.get("/file/:id/data", createHandler(async (req, res) => {
+router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
       where: eq(fitFiles.id, req.params.id),
@@ -205,18 +193,14 @@ router.get("/file/:id/data", createHandler(async (req, res) => {
       details: error.stack
     });
   }
-}));
+});
 
 // Upload handler with proper typing
 const uploadMiddleware = upload.array("files");
-router.post("/", (req: Request, res: Response) => {
+router.post("/", async (req: AuthenticatedRequest, res: Response) => {
   uploadMiddleware(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ error: err.message });
-    }
-
-    if (!isAuthenticated(req)) {
-      return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
@@ -264,7 +248,7 @@ router.post("/", (req: Request, res: Response) => {
 });
 
 // Other routes with proper typing
-router.delete("/:id", createHandler(async (req, res) => {
+router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
       where: and(
@@ -300,7 +284,7 @@ router.delete("/:id", createHandler(async (req, res) => {
     console.error("Error deleting dataset:", error);
     res.status(500).json({ error: "Failed to delete dataset" });
   }
-}));
+});
 
 router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Response) => {
   try {
@@ -366,8 +350,7 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
   }
 });
 
-
-router.patch("/:id", createHandler(async (req, res) => {
+router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
       where: and(
@@ -393,9 +376,9 @@ router.patch("/:id", createHandler(async (req, res) => {
     console.error("Error updating dataset:", error);
     res.status(500).json({ error: "Failed to update dataset" });
   }
-}));
+});
 
-router.post("/:id/share", createHandler(async (req, res) => {
+router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
       where: and(
@@ -423,9 +406,9 @@ router.post("/:id/share", createHandler(async (req, res) => {
     console.error("Error sharing dataset:", error);
     res.status(500).json({ error: "Failed to share dataset" });
   }
-}));
+});
 
-router.delete("/:datasetId/file/:fileId", createHandler(async (req, res) => {
+router.delete("/:datasetId/file/:fileId", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
       where: eq(fitFiles.id, req.params.fileId),
@@ -459,6 +442,6 @@ router.delete("/:datasetId/file/:fileId", createHandler(async (req, res) => {
     console.error("Error deleting file:", error);
     res.status(500).json({ error: "Failed to delete file" });
   }
-}));
+});
 
 export default router;

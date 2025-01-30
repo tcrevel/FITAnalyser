@@ -6,7 +6,7 @@ import { eq, or } from "drizzle-orm";
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    id: string;
+    id: string;  // Firebase UID
     email: string;
   };
 }
@@ -19,7 +19,7 @@ export const requireAuth = async (
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({ error: "No token provided" });
     }
 
     const token = authHeader.split('Bearer ')[1];
@@ -65,6 +65,6 @@ export const requireAuth = async (
     next();
   } catch (error) {
     console.error("Auth middleware error:", error);
-    res.status(401).json({ message: "Unauthorized" });
+    res.status(401).json({ error: "Unauthorized" });
   }
 };
