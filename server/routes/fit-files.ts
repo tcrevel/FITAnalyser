@@ -12,7 +12,8 @@ import { promisify } from "util";
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
   user: {
-    id: number;
+    id: string;  // Updated to string for Firebase UID
+    email: string;
   };
 }
 
@@ -76,8 +77,9 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
+    // Check if the dataset belongs to the authenticated user
     if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized" });
+      return res.status(403).json({ error: "Unauthorized access to dataset" });
     }
 
     res.json(dataset);
@@ -101,14 +103,13 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       return res.status(404).json({ error: "File not found" });
     }
 
+    // Check if the file's dataset belongs to the authenticated user
     if (file.dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized" });
+      return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
-
-    // Dynamically import the fit-file-parser package
     const { default: FitParser } = await import('fit-file-parser');
 
     const fitParser = new FitParser({
@@ -124,7 +125,6 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
           console.error("FIT parse error:", error);
           reject(error);
         } else {
-          console.log("Successfully parsed FIT data");
           resolve(data);
         }
       });
@@ -136,11 +136,9 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       power: record.power || 0,
       cadence: record.cadence || 0,
       heartRate: record.heart_rate || 0,
-      // Speed is already in km/h from parser configuration
       speed: record.speed ? Math.min(Math.max(record.speed, 0), 100) : 0,
-      // Convert altitude to meters and ensure it's within reasonable range
       altitude: record.enhanced_altitude 
-        ? Math.round(record.enhanced_altitude * 1000) // Convert to meters if in kilometers
+        ? Math.round(record.enhanced_altitude * 1000)
         : record.altitude
           ? Math.round(record.altitude * 1000) 
           : 0,
@@ -163,7 +161,7 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 
     const name = req.body.name || 'New Dataset';
 
-    // Create a new dataset
+    // Create a new dataset with the authenticated user's ID
     const [newDataset] = await db.insert(datasets)
       .values({
         name,
@@ -185,12 +183,10 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
       })
     );
 
-    const dataset = {
+    res.status(201).json({
       ...newDataset,
       fitFiles: insertedFiles,
-    };
-
-    res.status(201).json(dataset);
+    });
   } catch (error) {
     console.error("Error uploading fit files:", error);
     res.status(500).json({ error: "Failed to upload fit files" });
@@ -211,8 +207,9 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
+    // Check if the dataset belongs to the authenticated user
     if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized" });
+      return res.status(403).json({ error: "Unauthorized deletion attempt" });
     }
 
     // Delete all physical files
@@ -226,7 +223,7 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
       })
     );
 
-    // Delete the dataset (this will cascade delete all associated fit files)
+    // Delete the dataset (cascade will delete associated fit files)
     await db.delete(datasets)
       .where(eq(datasets.id, dataset.id));
 
@@ -248,8 +245,9 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
+    // Check if the dataset belongs to the authenticated user
     if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized" });
+      return res.status(403).json({ error: "Unauthorized update attempt" });
     }
 
     const [updatedDataset] = await db.update(datasets)
@@ -278,8 +276,9 @@ router.delete("/:datasetId/file/:fileId", async (req: AuthenticatedRequest, res:
       return res.status(404).json({ error: "File not found" });
     }
 
+    // Check if the file's dataset belongs to the authenticated user
     if (file.dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized" });
+      return res.status(403).json({ error: "Unauthorized deletion attempt" });
     }
 
     // Delete the physical file
