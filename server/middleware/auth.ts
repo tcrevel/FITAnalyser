@@ -25,11 +25,12 @@ export const requireAuth = async (
     const token = authHeader.split('Bearer ')[1];
     const decodedToken = await getAuth().verifyIdToken(token);
 
-    // Get or create user in our database
+    // Get user from our database without creating a new one
     let user = await db.query.users.findFirst({
       where: eq(users.id, decodedToken.uid)
     });
 
+    // Only create new user if they don't exist
     if (!user) {
       const [newUser] = await db
         .insert(users)
