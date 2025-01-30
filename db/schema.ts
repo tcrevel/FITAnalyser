@@ -12,6 +12,7 @@ export const datasets = pgTable("datasets", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   userId: text("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  shareToken: text("share_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

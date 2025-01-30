@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, Settings, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { DatasetEditModal } from "@/components/dashboard/dataset-edit-modal";
 import { getAuth } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 type FitFile = {
   id: string;
@@ -40,6 +41,7 @@ type ProcessedDataSet = {
 };
 
 export default function DatasetView() {
+  const { toast } = useToast();
   const [, params] = useRoute("/dashboard/dataset/:id");
   const id = params?.id;
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
@@ -113,6 +115,44 @@ export default function DatasetView() {
 
   const isLoading = isLoadingDataset || isLoadingData;
 
+  const handleShare = async () => {
+    try {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`/api/fit-files/${id}/share`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to share dataset");
+      }
+
+      const { shareToken } = await response.json();
+      const shareUrl = `${window.location.origin}/shared/${shareToken}`;
+      await navigator.clipboard.writeText(shareUrl);
+
+      toast({
+        title: "Link copied!",
+        description: "Share this link with others to view this dataset.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -153,6 +193,13 @@ export default function DatasetView() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{dataset?.name}</h1>
         <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4 mr-2" />
+            Share Dataset
+          </Button>
           <Button 
             variant="outline"
             onClick={() => setEditModalOpen(true)}

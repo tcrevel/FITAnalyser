@@ -22,7 +22,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b px-4">
         <Link to="/dashboard" className="flex items-center gap-2 font-semibold">
           <SiFirebase className="h-6 w-6 text-orange-500" />
-          <span>Firebase Dashboard</span>
+          <span>Fit Compare Tool</span>
         </Link>
       </div>
       <ScrollArea className="flex-1 px-2">

@@ -8,6 +8,7 @@ import type { Request, Response } from "express";
 import { requireAuth } from "../middleware/auth";
 import fs from "fs";
 import { promisify } from "util";
+import crypto from 'crypto';
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
@@ -41,6 +42,89 @@ const upload = multer({
       cb(new Error("Only .fit files are allowed"));
     }
   },
+});
+
+// Public endpoints for shared datasets
+router.get("/shared/:token", async (req: Request, res: Response) => {
+  try {
+    const dataset = await db.query.datasets.findFirst({
+      where: eq(datasets.shareToken, req.params.token),
+      with: {
+        fitFiles: true,
+      },
+    });
+
+    if (!dataset) {
+      return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    res.json(dataset);
+  } catch (error) {
+    console.error("Error fetching shared dataset:", error);
+    res.status(500).json({ error: "Failed to fetch shared dataset" });
+  }
+});
+
+router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Response) => {
+  try {
+    const dataset = await db.query.datasets.findFirst({
+      where: eq(datasets.shareToken, req.params.token),
+      with: {
+        fitFiles: true,
+      },
+    });
+
+    if (!dataset) {
+      return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    const file = dataset.fitFiles.find(f => f.id === req.params.fileId);
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const readFile = promisify(fs.readFile);
+    const buffer = await readFile(file.filePath);
+    const { default: FitParser } = await import('fit-file-parser');
+
+    const fitParser = new FitParser({
+      force: true,
+      speedUnit: 'km/h',
+      lengthUnit: 'km',
+      elapsedRecordField: true,
+    });
+
+    const parsedData: any = await new Promise((resolve, reject) => {
+      fitParser.parse(buffer, (error: Error, data: any) => {
+        if (error) {
+          console.error("FIT parse error:", error);
+          reject(error);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+
+    const records = parsedData.records || [];
+    const processedData = records.map((record: any, index: number) => ({
+      index,
+      power: record.power || 0,
+      cadence: record.cadence || 0,
+      heartRate: record.heart_rate || 0,
+      speed: record.speed ? Math.min(Math.max(record.speed, 0), 100) : 0,
+      altitude: record.enhanced_altitude 
+        ? Math.round(record.enhanced_altitude * 1000)
+        : record.altitude
+          ? Math.round(record.altitude * 1000) 
+          : 0,
+      timestamp: record.timestamp,
+    }));
+
+    res.json(processedData);
+  } catch (error: any) {
+    console.error("Error parsing shared fit file:", error);
+    res.status(500).json({ error: `Failed to parse fit file: ${error.message}` });
+  }
 });
 
 // Apply auth middleware to all routes
@@ -259,6 +343,34 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   } catch (error) {
     console.error("Error updating dataset:", error);
     res.status(500).json({ error: "Failed to update dataset" });
+  }
+});
+
+router.post("/:id/share", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const dataset = await db.query.datasets.findFirst({
+      where: eq(datasets.id, req.params.id),
+    });
+
+    if (!dataset) {
+      return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    if (dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    const shareToken = dataset.shareToken || crypto.randomUUID();
+
+    const [updatedDataset] = await db.update(datasets)
+      .set({ shareToken })
+      .where(eq(datasets.id, dataset.id))
+      .returning();
+
+    res.json({ shareToken: updatedDataset.shareToken });
+  } catch (error) {
+    console.error("Error sharing dataset:", error);
+    res.status(500).json({ error: "Failed to share dataset" });
   }
 });
 
