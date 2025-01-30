@@ -14,7 +14,6 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col">
         <header className="h-14 border-b px-6 flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="font-semibold">FIT Files</h1>
             <p className="text-sm text-muted-foreground">
               Welcome back, {user?.displayName || 'User'}!
             </p>

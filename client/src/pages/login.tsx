@@ -35,7 +35,7 @@ export default function Login() {
           <div className="flex justify-center mb-4">
             <SiFirebase className="h-12 w-12 text-orange-500" />
           </div>
-          <CardTitle>Welcome Back</CardTitle>
+          <CardTitle>FIT Compare Tool</CardTitle>
           <CardDescription>Sign in to access your dashboard</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

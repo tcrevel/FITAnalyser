@@ -11,6 +11,7 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import DatasetView from "@/pages/dataset-view";
 import SharedDatasetView from "@/pages/shared-dataset-view";
+import Landing from "@/pages/landing";
 import { ProtectedRoute } from "@/components/protected-route";
 
 function Router() {
@@ -28,11 +29,7 @@ function Router() {
           <Dashboard />
         </ProtectedRoute>
       </Route>
-      <Route path="/">
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      </Route>
+      <Route path="/" component={Landing} />
       <Route component={NotFound} />
     </Switch>
   );
