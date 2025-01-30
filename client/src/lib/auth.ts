@@ -43,11 +43,6 @@ export const signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
   try {
     const result = await signInWithPopup(auth, provider);
-    // Even for Google sign-in, ensure email is verified
-    if (!result.user.emailVerified) {
-      // Send verification email if not already verified
-      await sendEmailVerification(result.user);
-    }
     return result.user;
   } catch (error) {
     console.error("Error signing in with Google:", error);
