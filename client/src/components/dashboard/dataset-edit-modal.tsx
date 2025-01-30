@@ -129,6 +129,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
       Array.from(fileInput.files).forEach(file => {
         formData.append('files', file);
       });
+      formData.append('name', name); // Add dataset name to ensure proper association
 
       const auth = getAuth();
       const token = await auth.currentUser?.getIdToken();
@@ -146,10 +147,16 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
       });
 
       if (!response.ok) {
-        throw new Error("Failed to upload files");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to upload files");
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] });
+      // Invalidate both the datasets list and the current dataset queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["datasets"] }),
+        queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] })
+      ]);
+
       toast({
         title: "Success",
         description: "Files uploaded successfully",
@@ -186,7 +193,11 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to delete file");
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["datasets"] }),
+        queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] })
+      ]);
+
       toast({
         title: "Success",
         description: "File deleted successfully",
