@@ -45,8 +45,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
   const [isUploading, setIsUploading] = useState(false);
   const queryClient = useQueryClient();
 
-  // Query to keep dataset data fresh
-  const { data: currentDataset } = useQuery({
+  const { data: currentDataset, refetch } = useQuery({
     queryKey: ["datasets", dataset.id],
     queryFn: async () => {
       const auth = getAuth();
@@ -151,10 +150,10 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error(errorData.error || "Failed to upload files");
       }
 
-      // Invalidate both the datasets list and the current dataset queries
+      // Invalidate queries and refetch current dataset
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["datasets"] }),
-        queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] })
+        refetch()
       ]);
 
       toast({
@@ -193,9 +192,10 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to delete file");
       }
 
+      // Invalidate queries and refetch current dataset
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["datasets"] }),
-        queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] })
+        refetch()
       ]);
 
       toast({
