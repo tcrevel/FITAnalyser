@@ -262,7 +262,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
                 <Label>Uploaded Files</Label>
                 <div className="rounded-md border">
                   <div className="p-2 space-y-2">
-                    {displayedDataset.fitFiles.map((file) => (
+                    {displayedDataset.fitFiles.map((file: { id: string; name: string }) => (
                       <div
                         key={file.id}
                         className="flex items-center justify-between rounded-md border p-2 hover:bg-accent"
