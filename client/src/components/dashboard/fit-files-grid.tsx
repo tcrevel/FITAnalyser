@@ -28,7 +28,6 @@ import { DatasetEditModal } from "./dataset-edit-modal";
 import { useAuthStore } from "@/lib/auth";
 import { getAuth } from "firebase/auth";
 
-
 type Dataset = {
   id: string;
   name: string;
@@ -65,9 +64,20 @@ async function uploadDataset(formData: FormData) {
 }
 
 async function deleteDataset(id: string) {
+  const auth = getAuth();
+  const token = await auth.currentUser?.getIdToken();
+
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+
   const response = await fetch(`/api/fit-files/${id}`, {
     method: "DELETE",
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
   });
+
   if (!response.ok) {
     throw new Error("Failed to delete dataset");
   }
@@ -85,7 +95,19 @@ export function FitFilesGrid() {
   const { data: datasets = [], isLoading } = useQuery<Dataset[]>({
     queryKey: ["datasets"],
     queryFn: async () => {
-      const response = await fetch("/api/fit-files");
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch("/api/fit-files", {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
       if (!response.ok) {
         throw new Error("Failed to fetch datasets");
       }
