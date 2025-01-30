@@ -26,7 +26,9 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: uploadsDir,
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
