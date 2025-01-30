@@ -4,9 +4,12 @@ import {
   signInWithPopup, 
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword 
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  User
 } from "firebase/auth";
 import { create } from "zustand";
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthStore {
   user: null | {
@@ -14,6 +17,7 @@ interface AuthStore {
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
+    emailVerified: boolean;
   };
   loading: boolean;
   setUser: (user: any) => void;
@@ -23,7 +27,15 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   loading: true,
-  setUser: (user) => set({ user }),
+  setUser: (user) => set({ 
+    user: user ? {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      emailVerified: user.emailVerified,
+    } : null 
+  }),
   setLoading: (loading) => set({ loading })
 }));
 
@@ -51,9 +63,30 @@ export const signInWithEmail = async (email: string, password: string) => {
 export const registerWithEmail = async (email: string, password: string) => {
   try {
     const result = await createUserWithEmailAndPassword(auth, email, password);
+    // Send verification email immediately after registration
+    await sendEmailVerification(result.user);
     return result.user;
   } catch (error) {
     console.error("Error registering with email:", error);
+    throw error;
+  }
+};
+
+export const sendVerificationEmail = async (user: User) => {
+  try {
+    await sendEmailVerification(user);
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+    throw error;
+  }
+};
+
+export const checkEmailVerification = async (user: User) => {
+  try {
+    await user.reload(); // Refresh the user to get the latest emailVerified status
+    return user.emailVerified;
+  } catch (error) {
+    console.error("Error checking email verification:", error);
     throw error;
   }
 };

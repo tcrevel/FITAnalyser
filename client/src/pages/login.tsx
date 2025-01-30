@@ -11,7 +11,14 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     try {
-      await signInWithGoogle();
+      const user = await signInWithGoogle();
+      if (!user.emailVerified) {
+        toast({
+          title: "Email Verification Required",
+          description: "Please verify your email address before continuing.",
+          variant: "default",
+        });
+      }
       setLocation("/dashboard");
     } catch (error) {
       toast({
