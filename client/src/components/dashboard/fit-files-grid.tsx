@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, Plus, Trash2, Settings, Upload } from "lucide-react";
+import { Eye, Plus, Trash2, Settings, Upload, Share2 } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -190,6 +190,44 @@ export function FitFilesGrid() {
     }
   };
 
+  const handleShare = async (datasetId: string) => {
+    try {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`/api/fit-files/${datasetId}/share`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to share dataset");
+      }
+
+      const { shareToken } = await response.json();
+      const shareUrl = `${window.location.origin}/shared/${shareToken}`;
+      await navigator.clipboard.writeText(shareUrl);
+
+      toast({
+        title: "Link copied!",
+        description: "Share this link with others to view this dataset.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -281,6 +319,13 @@ export function FitFilesGrid() {
                         onClick={() => setLocation(`/dashboard/dataset/${dataset.id}`)}
                       >
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleShare(dataset.id)}
+                      >
+                        <Share2 className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
