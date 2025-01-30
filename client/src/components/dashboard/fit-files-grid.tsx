@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, Plus, Trash2, Settings, Upload, Share2 } from "lucide-react";
+import { Eye, Plus, Trash2, Settings, Upload, Share2, Copy, Check } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -91,6 +91,10 @@ export function FitFilesGrid() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [datasetToDelete, setDatasetToDelete] = useState<string | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [sharingDataset, setSharingDataset] = useState<{ id: string, name: string } | null>(null);
+  const [shareUrl, setShareUrl] = useState<string>("");
+  const [isCopied, setIsCopied] = useState(false);
 
   const { data: datasets = [], isLoading } = useQuery<Dataset[]>({
     queryKey: ["datasets"],
@@ -190,8 +194,11 @@ export function FitFilesGrid() {
     }
   };
 
-  const handleShare = async (datasetId: string) => {
+  const handleShare = async (dataset: { id: string, name: string }) => {
     try {
+      setSharingDataset(dataset);
+      setShareDialogOpen(true);
+
       const auth = getAuth();
       const token = await auth.currentUser?.getIdToken();
 
@@ -199,7 +206,7 @@ export function FitFilesGrid() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch(`/api/fit-files/${datasetId}/share`, {
+      const response = await fetch(`/api/fit-files/${dataset.id}/share`, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${token}`
@@ -211,22 +218,35 @@ export function FitFilesGrid() {
       }
 
       const { shareToken } = await response.json();
-      const shareUrl = `${window.location.origin}/shared/${shareToken}`;
-      await navigator.clipboard.writeText(shareUrl);
-
-      toast({
-        title: "Link copied!",
-        description: "Share this link with others to view this dataset.",
-      });
+      const url = `${window.location.origin}/shared/${shareToken}`;
+      setShareUrl(url);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+      setShareDialogOpen(false);
     }
   };
 
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+      toast({
+        title: "Success",
+        description: "Link copied to clipboard",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -323,7 +343,7 @@ export function FitFilesGrid() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleShare(dataset.id)}
+                        onClick={() => handleShare({ id: dataset.id, name: dataset.name })}
                       >
                         <Share2 className="h-4 w-4" />
                       </Button>
@@ -382,6 +402,44 @@ export function FitFilesGrid() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Dataset</DialogTitle>
+            <DialogDescription>
+              Share this link with others to let them view the dataset "{sharingDataset?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <Input
+              value={shareUrl}
+              readOnly
+              className="flex-1"
+            />
+            <Button
+              size="icon"
+              onClick={handleCopyLink}
+              variant="outline"
+            >
+              {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShareDialogOpen(false);
+                setSharingDataset(null);
+                setShareUrl("");
+                setIsCopied(false);
+              }}
+            >
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>
