@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, Upload } from "lucide-react";
+import { Trash2, Upload, Check } from "lucide-react";
 import { getAuth } from "firebase/auth";
 import {
   AlertDialog,
@@ -44,6 +44,30 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const queryClient = useQueryClient();
+
+  // Query to keep dataset data fresh
+  const { data: currentDataset } = useQuery({
+    queryKey: ["datasets", dataset.id],
+    queryFn: async () => {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`/api/fit-files/${dataset.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch dataset");
+      }
+      return response.json();
+    },
+    enabled: open, // Only fetch when modal is open
+  });
 
   const handleUpdateDataset = async () => {
     try {
@@ -125,7 +149,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to upload files");
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      await queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] });
       toast({
         title: "Success",
         description: "Files uploaded successfully",
@@ -162,7 +186,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to delete file");
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      await queryClient.invalidateQueries({ queryKey: ["datasets", dataset.id] });
       toast({
         title: "Success",
         description: "File deleted successfully",
@@ -175,6 +199,9 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
       });
     }
   };
+
+  // Use the current dataset data from the query if available, otherwise use the prop
+  const displayedDataset = currentDataset || dataset;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -224,7 +251,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
                 <Label>Uploaded Files</Label>
                 <div className="rounded-md border">
                   <div className="p-2 space-y-2">
-                    {dataset.fitFiles.map((file) => (
+                    {displayedDataset.fitFiles.map((file) => (
                       <div
                         key={file.id}
                         className="flex items-center justify-between rounded-md border p-2 hover:bg-accent"
