@@ -9,7 +9,8 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
-  User
+  User,
+  onAuthStateChanged
 } from "firebase/auth";
 import { create } from "zustand";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +42,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
   }),
   setLoading: (loading) => set({ loading })
 }));
+
+// Initialize auth state listener
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // Always get fresh user data to ensure emailVerified is up to date
+    user.reload().then(() => {
+      useAuthStore.getState().setUser(auth.currentUser);
+    });
+  } else {
+    useAuthStore.getState().setUser(null);
+  }
+  useAuthStore.getState().setLoading(false);
+});
 
 export const signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
@@ -117,7 +131,13 @@ export const sendVerificationEmail = async (user: User) => {
 export const checkEmailVerification = async (user: User) => {
   try {
     await user.reload();
-    return user.emailVerified;
+    const currentUser = auth.currentUser;
+    if (currentUser && currentUser.emailVerified) {
+      // Update the auth store with the fresh user data
+      useAuthStore.getState().setUser(currentUser);
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error("Error checking email verification:", error);
     throw error;
