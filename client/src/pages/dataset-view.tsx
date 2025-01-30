@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { DatasetEditModal } from "@/components/dashboard/dataset-edit-modal";
 import { getAuth } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
+import { StatsGrid } from "@/components/dashboard/stats-grid";
 
 type FitFile = {
   id: string;
@@ -243,6 +244,10 @@ export default function DatasetView() {
           </div>
         </CardContent>
       </Card>
+
+      {fileData.length > 0 && (
+        <StatsGrid datasets={fileData} />
+      )}
 
       <div className="grid gap-6">
         <MetricGraph
