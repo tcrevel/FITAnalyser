@@ -3,10 +3,8 @@ import { db } from "../db";
 import { datasets, fitFiles } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import multer from "multer";
-import path from "path";
 import type { Request, Response, RequestHandler } from "express";
 import { requireAuth } from "../middleware/auth";
-import fs from "fs";
 import { promisify } from "util";
 import crypto from 'crypto';
 
@@ -20,25 +18,11 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
-// Update the uploads directory path to use Replit's persistent storage
-const uploadsDir = path.join('/home/runner', process.env.REPL_SLUG || 'repl', 'uploads', 'fit-files');
-fs.mkdirSync(uploadsDir, { recursive: true });
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
-  },
-});
-
-const upload = multer({ 
-  storage,
+// Configure multer for memory storage instead of disk
+const upload = multer({
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/octet-stream" && path.extname(file.originalname).toLowerCase() === '.fit') {
+    if (file.mimetype === "application/octet-stream" && file.originalname.toLowerCase().endsWith('.fit')) {
       cb(null, true);
     } else {
       cb(new Error("Only .fit files are allowed"));
@@ -67,8 +51,7 @@ router.get("/shared/:token", async (req: Request, res: Response) => {
       createdAt: dataset.createdAt,
       fitFiles: dataset.fitFiles.map(file => ({
         id: file.id,
-        name: file.name,
-        filePath: file.filePath
+        name: file.name
       }))
     };
 
@@ -99,30 +82,6 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Rest of the routes remain the same, just ensure they use AuthenticatedRequest type
-router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const dataset = await db.query.datasets.findFirst({
-      where: and(
-        eq(datasets.id, req.params.id),
-        eq(datasets.userId, req.user.id)
-      ),
-      with: {
-        fitFiles: true,
-      },
-    });
-
-    if (!dataset) {
-      return res.status(404).json({ error: "Dataset not found" });
-    }
-
-    res.json(dataset);
-  } catch (error) {
-    console.error("Error fetching dataset:", error);
-    res.status(500).json({ error: "Failed to fetch dataset" });
-  }
-});
-
 // Get the parsed data from a fit file
 router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -142,9 +101,6 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
-    console.log("Reading file from path:", file.filePath); // Debug log
-    const readFile = promisify(fs.readFile);
-    const buffer = await readFile(file.filePath);
     const { default: FitParserModule } = await import('fit-file-parser');
 
     const fitParser = new FitParserModule({
@@ -155,12 +111,12 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
     });
 
     const parsedData: any = await new Promise((resolve, reject) => {
-      fitParser.parse(buffer, (error: Error, data: any) => {
+      fitParser.parse(file.content, (error: Error, data: any) => {
         if (error) {
           console.error("FIT parse error:", error);
           reject(error);
         } else {
-          console.log("FIT file parsed successfully, records:", data.records?.length); // Debug log
+          console.log("FIT file parsed successfully, records:", data.records?.length);
           resolve(data);
         }
       });
@@ -210,9 +166,6 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
 
       const name = req.body.name || 'New Dataset';
 
-      // Ensure uploads directory exists
-      await fs.promises.mkdir(uploadsDir, { recursive: true });
-
       // Create a new dataset
       const [newDataset] = await db.insert(datasets)
         .values({
@@ -228,7 +181,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
             .values({
               name: file.originalname,
               datasetId: newDataset.id,
-              filePath: file.path,
+              content: file.buffer, // Store the file content directly in the database
             })
             .returning();
 
@@ -247,7 +200,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
   });
 });
 
-// Other routes with proper typing
+// Delete dataset and associated files
 router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
@@ -255,25 +208,11 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
         eq(datasets.id, req.params.id),
         eq(datasets.userId, req.user.id)
       ),
-      with: {
-        fitFiles: true,
-      },
     });
 
     if (!dataset) {
       return res.status(404).json({ error: "Dataset not found" });
     }
-
-    // Delete all physical files
-    await Promise.all(
-      dataset.fitFiles.map(async (file) => {
-        try {
-          await fs.promises.unlink(file.filePath);
-        } catch (error) {
-          console.error("Error deleting file from disk:", error);
-        }
-      })
-    );
 
     // Delete the dataset (cascade will delete associated fit files)
     await db.delete(datasets)
@@ -306,8 +245,6 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
       return res.status(404).json({ error: "File not found" });
     }
 
-    const readFile = promisify(fs.readFile);
-    const buffer = await readFile(file.filePath);
     const { default: FitParserModule } = await import('fit-file-parser');
 
     const fitParser = new FitParserModule({
@@ -318,7 +255,7 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
     });
 
     const parsedData: any = await new Promise((resolve, reject) => {
-      fitParser.parse(buffer, (error: Error, data: any) => {
+      fitParser.parse(file.content, (error: Error, data: any) => {
         if (error) {
           console.error("FIT parse error:", error);
           reject(error);
@@ -405,42 +342,6 @@ router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
   } catch (error) {
     console.error("Error sharing dataset:", error);
     res.status(500).json({ error: "Failed to share dataset" });
-  }
-});
-
-router.delete("/:datasetId/file/:fileId", async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const file = await db.query.fitFiles.findFirst({
-      where: eq(fitFiles.id, req.params.fileId),
-      with: {
-        dataset: true,
-      },
-    });
-
-    if (!file) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    // Check if the file's dataset belongs to the authenticated user
-    if (file.dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized deletion attempt" });
-    }
-
-    // Delete the physical file
-    try {
-      await fs.promises.unlink(file.filePath);
-    } catch (error) {
-      console.error("Error deleting file from disk:", error);
-    }
-
-    // Delete the file record from database
-    await db.delete(fitFiles)
-      .where(eq(fitFiles.id, file.id));
-
-    res.json({ message: "File deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting file:", error);
-    res.status(500).json({ error: "Failed to delete file" });
   }
 });
 
