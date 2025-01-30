@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [authMethod, setAuthMethod] = useState<'password' | 'passwordless'>('password');
+  const [authMethod, setAuthMethod] = useState<'password' | 'passwordless'>('passwordless');
 
   useEffect(() => {
     const handleEmailLink = async () => {
@@ -137,18 +137,18 @@ export default function Login() {
 
           <div className="flex justify-center space-x-2 mb-4">
             <Button
-              variant={authMethod === 'password' ? 'default' : 'outline'}
-              onClick={() => setAuthMethod('password')}
-              size="sm"
-            >
-              Password
-            </Button>
-            <Button
               variant={authMethod === 'passwordless' ? 'default' : 'outline'}
               onClick={() => setAuthMethod('passwordless')}
               size="sm"
             >
               Magic Link
+            </Button>
+            <Button
+              variant={authMethod === 'password' ? 'default' : 'outline'}
+              onClick={() => setAuthMethod('password')}
+              size="sm"
+            >
+              Password
             </Button>
           </div>
 
