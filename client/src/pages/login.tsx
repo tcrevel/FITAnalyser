@@ -4,21 +4,17 @@ import { signInWithGoogle } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { AuthForm } from "@/components/auth/auth-form";
+import { EmailLinkAuth } from "@/components/auth/email-link-auth";
+import { useState } from "react";
 
 export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [authMethod, setAuthMethod] = useState<'password' | 'passwordless'>('password');
 
   const handleGoogleSignIn = async () => {
     try {
       const user = await signInWithGoogle();
-      if (!user.emailVerified) {
-        toast({
-          title: "Email Verification Required",
-          description: "Please verify your email address before continuing.",
-          variant: "default",
-        });
-      }
       setLocation("/dashboard");
     } catch (error) {
       toast({
@@ -109,7 +105,28 @@ export default function Login() {
             </div>
           </div>
 
-          <AuthForm onSuccess={handleAuthSuccess} />
+          <div className="flex justify-center space-x-2 mb-4">
+            <Button
+              variant={authMethod === 'password' ? 'default' : 'outline'}
+              onClick={() => setAuthMethod('password')}
+              size="sm"
+            >
+              Password
+            </Button>
+            <Button
+              variant={authMethod === 'passwordless' ? 'default' : 'outline'}
+              onClick={() => setAuthMethod('passwordless')}
+              size="sm"
+            >
+              Magic Link
+            </Button>
+          </div>
+
+          {authMethod === 'password' ? (
+            <AuthForm onSuccess={handleAuthSuccess} />
+          ) : (
+            <EmailLinkAuth />
+          )}
         </CardContent>
       </Card>
     </div>
