@@ -15,16 +15,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
+import {
+  Dialog,
+  DialogContent,
   DialogDescription,
   DialogFooter,
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { DatasetEditModal } from "./dataset-edit-modal";
+import { useAuthStore } from "@/lib/auth";
+import { getAuth } from "firebase/auth";
+
 
 type Dataset = {
   id: string;
@@ -38,13 +41,26 @@ type Dataset = {
 };
 
 async function uploadDataset(formData: FormData) {
+  const auth = getAuth();
+  const token = await auth.currentUser?.getIdToken();
+
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+
   const response = await fetch("/api/fit-files", {
     method: "POST",
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
     body: formData,
   });
+
   if (!response.ok) {
-    throw new Error("Failed to upload files");
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to upload files");
   }
+
   return response.json();
 }
 
@@ -170,10 +186,10 @@ export function FitFilesGrid() {
             <form onSubmit={handleUpload} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Dataset Name</Label>
-                <Input 
-                  id="name" 
-                  name="name" 
-                  required 
+                <Input
+                  id="name"
+                  name="name"
+                  required
                   placeholder="Enter a name for this dataset"
                 />
               </div>
