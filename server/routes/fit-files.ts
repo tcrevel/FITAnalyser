@@ -268,6 +268,10 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 
     const name = req.body.name || 'New Dataset';
 
+    // Ensure uploads directory exists
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
+    console.log("Upload directory created/verified:", uploadsDir); // Debug log
+
     // Create a new dataset with the authenticated user's ID
     const [newDataset] = await db.insert(datasets)
       .values({
@@ -276,9 +280,17 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
       })
       .returning();
 
+    console.log("Created new dataset:", newDataset); // Debug log
+
     // Add all files to the dataset
     const insertedFiles = await Promise.all(
       (req.files as Express.Multer.File[]).map(async (file) => {
+        console.log("Processing uploaded file:", {  // Debug log
+          originalName: file.originalname,
+          path: file.path,
+          size: file.size
+        });
+
         const [newFile] = await db.insert(fitFiles)
           .values({
             name: file.originalname,
@@ -286,6 +298,16 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
             filePath: file.path,
           })
           .returning();
+
+        // Verify file exists after upload
+        try {
+          await fs.promises.access(file.path);
+          console.log("File successfully saved:", file.path); // Debug log
+        } catch (error) {
+          console.error("File not found after upload:", file.path); // Debug log
+          throw new Error(`File not found after upload: ${file.path}`);
+        }
+
         return newFile;
       })
     );
