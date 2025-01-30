@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { Trash2, Upload } from "lucide-react";
 import { getAuth } from "firebase/auth";
 import {
   AlertDialog,
@@ -42,6 +42,7 @@ interface DatasetEditModalProps {
 export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditModalProps) {
   const [name, setName] = useState(dataset.name);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const queryClient = useQueryClient();
 
   const handleUpdateDataset = async () => {
@@ -81,6 +82,63 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleUploadFiles = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const fileInput = form.querySelector<HTMLInputElement>('input[type="file"]');
+
+    if (!fileInput?.files?.length) {
+      toast({
+        title: "Error",
+        description: "Please select files to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      Array.from(fileInput.files).forEach(file => {
+        formData.append('files', file);
+      });
+
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`/api/fit-files/${dataset.id}/upload`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload files");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      toast({
+        title: "Success",
+        description: "Files uploaded successfully",
+      });
+      form.reset();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -140,6 +198,28 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
                   placeholder="Enter dataset name"
                 />
               </div>
+
+              <form onSubmit={handleUploadFiles} className="space-y-2">
+                <Label htmlFor="files">Upload Files</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="files"
+                    name="files"
+                    type="file"
+                    accept=".fit"
+                    multiple
+                    required
+                    className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 
+                             file:text-sm file:font-semibold file:bg-primary/10 file:text-primary 
+                             hover:file:bg-primary/20"
+                  />
+                  <Button type="submit" disabled={isUploading} className="flex-shrink-0">
+                    <Upload className="h-4 w-4 mr-2" />
+                    {isUploading ? "Uploading..." : "Upload"}
+                  </Button>
+                </div>
+              </form>
+
               <div className="space-y-2">
                 <Label>Uploaded Files</Label>
                 <div className="rounded-md border">
