@@ -85,7 +85,7 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
 
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
-    const FitParser = (await import('fit-file-parser')).default;
+    const { default: FitParser } = await import('fit-file-parser');
 
     const fitParser = new FitParser({
       force: true,
@@ -194,7 +194,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
 
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
-    const FitParser = (await import('fit-file-parser')).default;
+    const { default: FitParser } = await import('fit-file-parser');
 
     const fitParser = new FitParser({
       force: true,
