@@ -99,9 +99,9 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
 
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
-    const { default: FitParser } = await import('fit-file-parser');
+    const { default: FitParserModule } = await import('fit-file-parser');
 
-    const fitParser = new FitParser({
+    const fitParser = new FitParserModule({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
@@ -204,11 +204,12 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
+    console.log("Reading file from path:", file.filePath); // Debug log
     const readFile = promisify(fs.readFile);
     const buffer = await readFile(file.filePath);
-    const { default: FitParser } = await import('fit-file-parser');
+    const { default: FitParserModule } = await import('fit-file-parser');
 
-    const fitParser = new FitParser({
+    const fitParser = new FitParserModule({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
@@ -221,6 +222,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
           console.error("FIT parse error:", error);
           reject(error);
         } else {
+          console.log("FIT file parsed successfully, records:", data.records?.length); // Debug log
           resolve(data);
         }
       });
@@ -243,8 +245,17 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
 
     res.json(processedData);
   } catch (error: any) {
-    console.error("Error parsing fit file:", error);
-    res.status(500).json({ error: `Failed to parse fit file: ${error.message}` });
+    console.error("Error parsing fit file:", {
+      error: error.message,
+      stack: error.stack,
+      fileId: req.params.id
+    });
+
+    // Send a more detailed error response
+    res.status(500).json({ 
+      error: `Failed to parse fit file: ${error.message}`,
+      details: error.stack
+    });
   }
 });
 
