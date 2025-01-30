@@ -182,6 +182,9 @@ export function FitFilesGrid() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Upload FIT Files</DialogTitle>
+              <DialogDescription>
+                Select multiple .fit files and provide a name for your dataset.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleUpload} className="space-y-4">
               <div className="space-y-2">

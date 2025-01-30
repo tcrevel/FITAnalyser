@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { DatasetEditModal } from "@/components/dashboard/dataset-edit-modal";
+import { getAuth } from "firebase/auth";
 
 type FitFile = {
   id: string;
@@ -46,23 +47,58 @@ export default function DatasetView() {
 
   const { data: dataset, isLoading: isLoadingDataset } = useQuery<Dataset>({
     queryKey: ["datasets", id],
-    queryFn: () => fetch(`/api/fit-files/${id}`).then(res => res.json()),
+    queryFn: async () => {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`/api/fit-files/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch dataset");
+      }
+      return response.json();
+    },
     enabled: !!id,
   });
 
   const { data: fileData = [], isLoading: isLoadingData } = useQuery<ProcessedDataSet[]>({
     queryKey: ["fit-files-data", selectedFileIds],
     queryFn: async () => {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
       const dataPromises = selectedFileIds.map(async fileId => {
         const file = dataset?.fitFiles.find(f => f.id === fileId);
         if (!file) return null;
-        const response = await fetch(`/api/fit-files/file/${fileId}/data`);
+
+        const response = await fetch(`/api/fit-files/file/${fileId}/data`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch file data");
+        }
+
         const data = await response.json();
         return {
           name: file.name,
           data,
         };
       });
+
       const results = await Promise.all(dataPromises);
       return results.filter((result): result is ProcessedDataSet => result !== null);
     },
