@@ -20,8 +20,8 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), "uploads", "fit-files");
+// Update the uploads directory path to use Replit's persistent storage
+const uploadsDir = path.join('/home/runner', process.env.REPL_SLUG || 'repl', 'uploads', 'fit-files');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Configure multer for file uploads
