@@ -1,17 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { ArrowLeft, Settings, Share2 } from "lucide-react";
+import { ArrowLeft, Settings, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricGraph } from "@/components/dashboard/metric-graph";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DatasetEditModal } from "@/components/dashboard/dataset-edit-modal";
 import { getAuth } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { StatsGrid } from "@/components/dashboard/stats-grid";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 type FitFile = {
   id: string;
@@ -47,6 +49,8 @@ export default function DatasetView() {
   const id = params?.id;
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const { data: dataset, isLoading: isLoadingDataset } = useQuery<Dataset>({
     queryKey: ["datasets", id],
@@ -60,8 +64,8 @@ export default function DatasetView() {
 
       const response = await fetch(`/api/fit-files/${id}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!response.ok) {
         throw new Error("Failed to fetch dataset");
@@ -81,14 +85,14 @@ export default function DatasetView() {
         throw new Error("Not authenticated");
       }
 
-      const dataPromises = selectedFileIds.map(async fileId => {
-        const file = dataset?.fitFiles.find(f => f.id === fileId);
+      const dataPromises = selectedFileIds.map(async (fileId) => {
+        const file = dataset?.fitFiles.find((f) => f.id === fileId);
         if (!file) return null;
 
         const response = await fetch(`/api/fit-files/file/${fileId}/data`, {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         if (!response.ok) {
@@ -103,14 +107,16 @@ export default function DatasetView() {
       });
 
       const results = await Promise.all(dataPromises);
-      return results.filter((result): result is ProcessedDataSet => result !== null);
+      return results.filter(
+        (result): result is ProcessedDataSet => result !== null
+      );
     },
     enabled: selectedFileIds.length > 0 && !!dataset,
   });
 
   useEffect(() => {
     if (dataset?.fitFiles) {
-      setSelectedFileIds(dataset.fitFiles.map(f => f.id));
+      setSelectedFileIds(dataset.fitFiles.map((f) => f.id));
     }
   }, [dataset]);
 
@@ -128,8 +134,8 @@ export default function DatasetView() {
       const response = await fetch(`/api/fit-files/${id}/share`, {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
@@ -153,6 +159,72 @@ export default function DatasetView() {
     }
   };
 
+  const handleExportPNG = async () => {
+    if (!contentRef.current) return;
+
+    try {
+      setIsExporting(true);
+      const canvas = await html2canvas(contentRef.current, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      });
+
+      const link = document.createElement('a');
+      link.download = `${dataset?.name || 'dataset'}-export.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      toast({
+        title: "Success",
+        description: "Dataset exported as PNG successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to export as PNG",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!contentRef.current) return;
+
+    try {
+      setIsExporting(true);
+      const canvas = await html2canvas(contentRef.current, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${dataset?.name || 'dataset'}-export.pdf`);
+
+      toast({
+        title: "Success",
+        description: "Dataset exported as PDF successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to export as PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -181,9 +253,9 @@ export default function DatasetView() {
   }
 
   const handleFileSelection = (fileId: string) => {
-    setSelectedFileIds(prev => {
+    setSelectedFileIds((prev) => {
       if (prev.includes(fileId)) {
-        return prev.filter(id => id !== fileId);
+        return prev.filter((id) => id !== fileId);
       }
       return [...prev, fileId];
     });
@@ -194,17 +266,27 @@ export default function DatasetView() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{dataset?.name}</h1>
         <div className="flex gap-2">
-          <Button 
+          <Button
             variant="outline"
-            onClick={handleShare}
+            onClick={handleExportPNG}
+            disabled={isExporting}
           >
+            <Download className="h-4 w-4 mr-2" />
+            Export PNG
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportPDF}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
+          <Button variant="outline" onClick={handleShare}>
             <Share2 className="h-4 w-4 mr-2" />
             Share Dataset
           </Button>
-          <Button 
-            variant="outline"
-            onClick={() => setEditModalOpen(true)}
-          >
+          <Button variant="outline" onClick={() => setEditModalOpen(true)}>
             <Settings className="h-4 w-4 mr-2" />
             Edit Dataset
           </Button>
@@ -218,8 +300,8 @@ export default function DatasetView() {
       </div>
 
       {dataset && (
-        <DatasetEditModal 
-          open={editModalOpen} 
+        <DatasetEditModal
+          open={editModalOpen}
           onOpenChange={setEditModalOpen}
           dataset={dataset}
         />
@@ -231,7 +313,7 @@ export default function DatasetView() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dataset.fitFiles.map(file => (
+            {dataset.fitFiles.map((file) => (
               <div key={file.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={`file-${file.id}`}
@@ -245,50 +327,50 @@ export default function DatasetView() {
         </CardContent>
       </Card>
 
-      {fileData.length > 0 && (
-        <StatsGrid datasets={fileData} />
-      )}
+      <div ref={contentRef}>
+        {fileData.length > 0 && <StatsGrid datasets={fileData} />}
 
-      <div className="grid gap-6">
-        <MetricGraph
-          datasets={fileData}
-          metricKey="power"
-          title="Power Comparison"
-          color="#ef4444"
-          unit="watts"
-        />
+        <div className="grid gap-6">
+          <MetricGraph
+            datasets={fileData}
+            metricKey="power"
+            title="Power Comparison"
+            color="#ef4444"
+            unit="watts"
+          />
 
-        <MetricGraph
-          datasets={fileData}
-          metricKey="heartRate"
-          title="Heart Rate Comparison"
-          color="#ec4899"
-          unit="bpm"
-        />
+          <MetricGraph
+            datasets={fileData}
+            metricKey="heartRate"
+            title="Heart Rate Comparison"
+            color="#ec4899"
+            unit="bpm"
+          />
 
-        <MetricGraph
-          datasets={fileData}
-          metricKey="speed"
-          title="Speed Comparison"
-          color="#3b82f6"
-          unit="km/h"
-        />
+          <MetricGraph
+            datasets={fileData}
+            metricKey="speed"
+            title="Speed Comparison"
+            color="#3b82f6"
+            unit="km/h"
+          />
 
-        <MetricGraph
-          datasets={fileData}
-          metricKey="cadence"
-          title="Cadence Comparison"
-          color="#10b981"
-          unit="rpm"
-        />
+          <MetricGraph
+            datasets={fileData}
+            metricKey="cadence"
+            title="Cadence Comparison"
+            color="#10b981"
+            unit="rpm"
+          />
 
-        <MetricGraph
-          datasets={fileData}
-          metricKey="altitude"
-          title="Elevation Comparison"
-          color="#8b5cf6"
-          unit="m"
-        />
+          <MetricGraph
+            datasets={fileData}
+            metricKey="altitude"
+            title="Elevation Comparison"
+            color="#8b5cf6"
+            unit="m"
+          />
+        </div>
       </div>
     </div>
   );
