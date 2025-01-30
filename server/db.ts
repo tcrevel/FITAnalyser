@@ -10,7 +10,9 @@ const pool = new Pool({
   user: process.env.EXTERNAL_PG_USER,
   password: process.env.EXTERNAL_PG_PASSWORD,
   port: parseInt(process.env.EXTERNAL_PG_PORT || '5432'),
-  ssl: true
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 export const db = drizzle(pool, { schema });
