@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { Trash2 } from "lucide-react";
+import { getAuth } from "firebase/auth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,10 +47,18 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
   const handleUpdateDataset = async () => {
     try {
       setIsUpdating(true);
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch(`/api/fit-files/${dataset.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ name }),
       });
@@ -77,8 +86,18 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
 
   const handleDeleteFile = async (fileId: string) => {
     try {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch(`/api/fit-files/${dataset.id}/file/${fileId}`, {
         method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       });
 
       if (!response.ok) {
