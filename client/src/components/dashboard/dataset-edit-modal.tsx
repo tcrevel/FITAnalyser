@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -6,6 +6,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,31 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
     }
   };
 
+  const uploadFiles = useCallback(async (formData: FormData, retryCount = 0): Promise<Response> => {
+    const auth = getAuth();
+    const token = await auth.currentUser?.getIdToken(true); // Force refresh token
+
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+
+    const response = await fetch(`/api/fit-files/${dataset.id}/upload`, {
+      method: "POST",
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+
+    if (!response.ok && response.status === 401 && retryCount < 3) {
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return uploadFiles(formData, retryCount + 1);
+    }
+
+    return response;
+  }, [dataset.id]);
+
   const handleUploadFiles = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -128,22 +154,9 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
       Array.from(fileInput.files).forEach(file => {
         formData.append('files', file);
       });
-      formData.append('name', name); // Add dataset name to ensure proper association
+      formData.append('name', name);
 
-      const auth = getAuth();
-      const token = await auth.currentUser?.getIdToken();
-
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/fit-files/${dataset.id}/upload`, {
-        method: "POST",
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData,
-      });
+      const response = await uploadFiles(formData);
 
       if (!response.ok) {
         const errorData = await response.json();
