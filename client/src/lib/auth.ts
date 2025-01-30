@@ -66,7 +66,6 @@ export const signInWithEmail = async (email: string, password: string) => {
 export const registerWithEmail = async (email: string, password: string) => {
   try {
     const result = await createUserWithEmailAndPassword(auth, email, password);
-    // Send verification email immediately after registration
     await sendEmailVerification(result.user);
     return result.user;
   } catch (error) {
@@ -78,13 +77,12 @@ export const registerWithEmail = async (email: string, password: string) => {
 // Email Link (Passwordless) Authentication
 export const sendSignInLink = async (email: string) => {
   const actionCodeSettings = {
-    url: window.location.origin + '/login?mode=signIn&email=' + email,
+    url: window.location.origin + '/login?mode=signIn',
     handleCodeInApp: true,
   };
 
   try {
     await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-    // Save the email for later use
     window.localStorage.setItem('emailForSignIn', email);
   } catch (error) {
     console.error("Error sending sign-in link:", error);
@@ -99,7 +97,6 @@ export const completeSignInWithEmailLink = async (email: string) => {
     }
 
     const result = await signInWithEmailLink(auth, email, window.location.href);
-    // Clear email from storage
     window.localStorage.removeItem('emailForSignIn');
     return result.user;
   } catch (error) {
@@ -119,7 +116,7 @@ export const sendVerificationEmail = async (user: User) => {
 
 export const checkEmailVerification = async (user: User) => {
   try {
-    await user.reload(); // Refresh the user to get the latest emailVerified status
+    await user.reload();
     return user.emailVerified;
   } catch (error) {
     console.error("Error checking email verification:", error);
