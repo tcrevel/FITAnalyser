@@ -1,34 +1,51 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuthStore } from "@/lib/auth";
 import { EmailVerification } from "@/components/auth/email-verification";
 import { auth } from "@/lib/firebase";
+import { Loader2 } from "lucide-react";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
   const { user, loading } = useAuthStore();
+  const [verificationChecked, setVerificationChecked] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      setLocation("/login");
-    }
+    // Check auth state and verification status
+    const checkAuth = async () => {
+      if (!loading && !user) {
+        setLocation("/login");
+        return;
+      }
+
+      if (user && auth.currentUser) {
+        // Reload user to get fresh verification status
+        await auth.currentUser.reload();
+        setVerificationChecked(true);
+      }
+    };
+
+    checkAuth();
   }, [user, loading, setLocation]);
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  if (loading || !verificationChecked) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   if (!user) {
     return null;
   }
 
-  // Check if user is authenticated with Google
-  const isGoogleUser = auth.currentUser?.providerData.some(
-    provider => provider.providerId === 'google.com'
+  // Only show email verification for password-based users who haven't verified their email
+  const isPasswordUser = auth.currentUser?.providerData.some(
+    provider => provider.providerId === 'password'
   );
 
-  // Only show email verification for non-Google users
-  if (!user.emailVerified && !isGoogleUser) {
+  if (isPasswordUser && !user.emailVerified) {
     return <EmailVerification />;
   }
 

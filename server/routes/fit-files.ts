@@ -58,7 +58,19 @@ router.get("/shared/:token", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    res.json(dataset);
+    // Don't expose sensitive data in shared view
+    const sanitizedDataset = {
+      id: dataset.id,
+      name: dataset.name,
+      createdAt: dataset.createdAt,
+      fitFiles: dataset.fitFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        filePath: file.filePath
+      }))
+    };
+
+    res.json(sanitizedDataset);
   } catch (error) {
     console.error("Error fetching shared dataset:", error);
     res.status(500).json({ error: "Failed to fetch shared dataset" });
@@ -70,7 +82,9 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
     const dataset = await db.query.datasets.findFirst({
       where: eq(datasets.shareToken, req.params.token),
       with: {
-        fitFiles: true,
+        fitFiles: {
+          where: eq(fitFiles.id, req.params.fileId)
+        },
       },
     });
 
@@ -78,7 +92,7 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    const file = dataset.fitFiles.find(f => f.id === req.params.fileId);
+    const file = dataset.fitFiles[0];
     if (!file) {
       return res.status(404).json({ error: "File not found" });
     }
@@ -330,7 +344,10 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
 
     const [updatedDataset] = await db.update(datasets)
       .set({ name: req.body.name })
-      .where(eq(datasets.id, req.params.id))
+      .where(and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ))
       .returning();
 
     res.json(updatedDataset);
@@ -358,7 +375,10 @@ router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
 
     const [updatedDataset] = await db.update(datasets)
       .set({ shareToken })
-      .where(eq(datasets.id, dataset.id))
+      .where(and(
+        eq(datasets.id, dataset.id),
+        eq(datasets.userId, req.user.id)
+      ))
       .returning();
 
     res.json({ shareToken: updatedDataset.shareToken });

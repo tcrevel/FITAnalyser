@@ -1,24 +1,50 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { signInWithGoogle } from "@/lib/auth";
+import { signInWithGoogle, completeSignInWithEmailLink } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { AuthForm } from "@/components/auth/auth-form";
+import { EmailLinkAuth } from "@/components/auth/email-link-auth";
+import { useState, useEffect } from "react";
 
 export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [authMethod, setAuthMethod] = useState<'password' | 'passwordless'>('passwordless');
+
+  useEffect(() => {
+    const handleEmailLink = async () => {
+      // Check if this is an email sign-in link
+      const emailForSignIn = window.localStorage.getItem('emailForSignIn');
+      const searchParams = new URLSearchParams(window.location.search);
+      const mode = searchParams.get('mode');
+
+      if (emailForSignIn && mode === 'signIn') {
+        try {
+          const user = await completeSignInWithEmailLink(emailForSignIn);
+          if (user) {
+            toast({
+              title: "Success",
+              description: "You've successfully signed in!",
+            });
+            setLocation("/dashboard");
+          }
+        } catch (error: any) {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    handleEmailLink();
+  }, [toast, setLocation]);
 
   const handleGoogleSignIn = async () => {
     try {
       const user = await signInWithGoogle();
-      if (!user.emailVerified) {
-        toast({
-          title: "Email Verification Required",
-          description: "Please verify your email address before continuing.",
-          variant: "default",
-        });
-      }
       setLocation("/dashboard");
     } catch (error) {
       toast({
@@ -109,7 +135,28 @@ export default function Login() {
             </div>
           </div>
 
-          <AuthForm onSuccess={handleAuthSuccess} />
+          <div className="flex justify-center space-x-2 mb-4">
+            <Button
+              variant={authMethod === 'passwordless' ? 'default' : 'outline'}
+              onClick={() => setAuthMethod('passwordless')}
+              size="sm"
+            >
+              Magic Link
+            </Button>
+            <Button
+              variant={authMethod === 'password' ? 'default' : 'outline'}
+              onClick={() => setAuthMethod('password')}
+              size="sm"
+            >
+              Password
+            </Button>
+          </div>
+
+          {authMethod === 'password' ? (
+            <AuthForm onSuccess={handleAuthSuccess} />
+          ) : (
+            <EmailLinkAuth />
+          )}
         </CardContent>
       </Card>
     </div>

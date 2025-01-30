@@ -6,7 +6,11 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
-  User
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  User,
+  onAuthStateChanged
 } from "firebase/auth";
 import { create } from "zustand";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +43,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
   setLoading: (loading) => set({ loading })
 }));
 
+// Initialize auth state listener
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // Always get fresh user data to ensure emailVerified is up to date
+    user.reload().then(() => {
+      useAuthStore.getState().setUser(auth.currentUser);
+    });
+  } else {
+    useAuthStore.getState().setUser(null);
+  }
+  useAuthStore.getState().setLoading(false);
+});
+
 export const signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
   try {
@@ -63,11 +80,41 @@ export const signInWithEmail = async (email: string, password: string) => {
 export const registerWithEmail = async (email: string, password: string) => {
   try {
     const result = await createUserWithEmailAndPassword(auth, email, password);
-    // Send verification email immediately after registration
     await sendEmailVerification(result.user);
     return result.user;
   } catch (error) {
     console.error("Error registering with email:", error);
+    throw error;
+  }
+};
+
+// Email Link (Passwordless) Authentication
+export const sendSignInLink = async (email: string) => {
+  const actionCodeSettings = {
+    url: window.location.origin + '/login?mode=signIn',
+    handleCodeInApp: true,
+  };
+
+  try {
+    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+    window.localStorage.setItem('emailForSignIn', email);
+  } catch (error) {
+    console.error("Error sending sign-in link:", error);
+    throw error;
+  }
+};
+
+export const completeSignInWithEmailLink = async (email: string) => {
+  try {
+    if (!isSignInWithEmailLink(auth, window.location.href)) {
+      return null;
+    }
+
+    const result = await signInWithEmailLink(auth, email, window.location.href);
+    window.localStorage.removeItem('emailForSignIn');
+    return result.user;
+  } catch (error) {
+    console.error("Error completing sign-in with email link:", error);
     throw error;
   }
 };
@@ -83,8 +130,14 @@ export const sendVerificationEmail = async (user: User) => {
 
 export const checkEmailVerification = async (user: User) => {
   try {
-    await user.reload(); // Refresh the user to get the latest emailVerified status
-    return user.emailVerified;
+    await user.reload();
+    const currentUser = auth.currentUser;
+    if (currentUser && currentUser.emailVerified) {
+      // Update the auth store with the fresh user data
+      useAuthStore.getState().setUser(currentUser);
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error("Error checking email verification:", error);
     throw error;
