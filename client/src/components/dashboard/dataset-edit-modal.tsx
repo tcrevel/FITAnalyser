@@ -1,19 +1,18 @@
-import { useState, useCallback } from "react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, Upload, Check } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { getAuth } from "firebase/auth";
 import {
   AlertDialog,
@@ -43,31 +42,7 @@ interface DatasetEditModalProps {
 export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditModalProps) {
   const [name, setName] = useState(dataset.name);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const queryClient = useQueryClient();
-
-  const { data: currentDataset, refetch } = useQuery({
-    queryKey: ["datasets", dataset.id],
-    queryFn: async () => {
-      const auth = getAuth();
-      const token = await auth.currentUser?.getIdToken();
-
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/fit-files/${dataset.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch dataset");
-      }
-      return response.json();
-    },
-    enabled: open, // Only fetch when modal is open
-  });
 
   const handleUpdateDataset = async () => {
     try {
@@ -109,82 +84,6 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
     }
   };
 
-  const uploadFiles = useCallback(async (formData: FormData, retryCount = 0): Promise<Response> => {
-    const auth = getAuth();
-    const token = await auth.currentUser?.getIdToken(true); // Force refresh token
-
-    if (!token) {
-      throw new Error("Not authenticated");
-    }
-
-    const response = await fetch(`/api/fit-files/${dataset.id}/upload`, {
-      method: "POST",
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData,
-    });
-
-    if (!response.ok && response.status === 401 && retryCount < 3) {
-      // Wait a bit before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return uploadFiles(formData, retryCount + 1);
-    }
-
-    return response;
-  }, [dataset.id]);
-
-  const handleUploadFiles = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const fileInput = form.querySelector<HTMLInputElement>('input[type="file"]');
-
-    if (!fileInput?.files?.length) {
-      toast({
-        title: "Error",
-        description: "Please select files to upload",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const formData = new FormData();
-      Array.from(fileInput.files).forEach(file => {
-        formData.append('files', file);
-      });
-      formData.append('name', name);
-
-      const response = await uploadFiles(formData);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to upload files");
-      }
-
-      // Invalidate queries and refetch current dataset
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["datasets"] }),
-        refetch()
-      ]);
-
-      toast({
-        title: "Success",
-        description: "Files uploaded successfully",
-      });
-      form.reset();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleDeleteFile = async (fileId: string) => {
     try {
       const auth = getAuth();
@@ -205,12 +104,7 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
         throw new Error("Failed to delete file");
       }
 
-      // Invalidate queries and refetch current dataset
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["datasets"] }),
-        refetch()
-      ]);
-
+      await queryClient.invalidateQueries({ queryKey: ["datasets"] });
       toast({
         title: "Success",
         description: "File deleted successfully",
@@ -223,9 +117,6 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
       });
     }
   };
-
-  // Use the current dataset data from the query if available, otherwise use the prop
-  const displayedDataset = currentDataset || dataset;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -249,33 +140,11 @@ export function DatasetEditModal({ open, onOpenChange, dataset }: DatasetEditMod
                   placeholder="Enter dataset name"
                 />
               </div>
-
-              <form onSubmit={handleUploadFiles} className="space-y-2">
-                <Label htmlFor="files">Upload Files</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="files"
-                    name="files"
-                    type="file"
-                    accept=".fit"
-                    multiple
-                    required
-                    className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 
-                             file:text-sm file:font-semibold file:bg-primary/10 file:text-primary 
-                             hover:file:bg-primary/20"
-                  />
-                  <Button type="submit" disabled={isUploading} className="flex-shrink-0">
-                    <Upload className="h-4 w-4 mr-2" />
-                    {isUploading ? "Uploading..." : "Upload"}
-                  </Button>
-                </div>
-              </form>
-
               <div className="space-y-2">
                 <Label>Uploaded Files</Label>
                 <div className="rounded-md border">
                   <div className="p-2 space-y-2">
-                    {displayedDataset.fitFiles.map((file: { id: string; name: string }) => (
+                    {dataset.fitFiles.map((file) => (
                       <div
                         key={file.id}
                         className="flex items-center justify-between rounded-md border p-2 hover:bg-accent"
