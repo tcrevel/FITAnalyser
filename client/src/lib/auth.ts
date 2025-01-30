@@ -78,7 +78,7 @@ export const registerWithEmail = async (email: string, password: string) => {
 // Email Link (Passwordless) Authentication
 export const sendSignInLink = async (email: string) => {
   const actionCodeSettings = {
-    url: window.location.origin + '/login?email=' + email,
+    url: window.location.origin + '/login?mode=signIn&email=' + email,
     handleCodeInApp: true,
   };
 

@@ -14,12 +14,11 @@ export function EmailLinkAuth() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // Check if this is a sign-in completion redirect
-    const urlParams = new URLSearchParams(window.location.search);
-    const emailFromUrl = urlParams.get('email');
-    
-    if (emailFromUrl) {
-      completeEmailSignIn(emailFromUrl);
+    // Check if we have an email in localStorage
+    const emailForSignIn = window.localStorage.getItem('emailForSignIn');
+
+    if (emailForSignIn && window.location.href.includes('?mode=signIn')) {
+      completeEmailSignIn(emailForSignIn);
     }
   }, []);
 

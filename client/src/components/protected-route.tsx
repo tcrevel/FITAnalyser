@@ -22,13 +22,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // Check if user is authenticated with Google
+  // Check if user is authenticated with Google or Email Link
   const isGoogleUser = auth.currentUser?.providerData.some(
     provider => provider.providerId === 'google.com'
   );
+  const isEmailLinkUser = auth.currentUser?.providerData.some(
+    provider => provider.providerId === 'password' && user.emailVerified
+  );
 
-  // Only show email verification for non-Google users
-  if (!user.emailVerified && !isGoogleUser) {
+  // Only show email verification for password-based users who haven't verified their email
+  if (!user.emailVerified && !isGoogleUser && !isEmailLinkUser) {
     return <EmailVerification />;
   }
 
