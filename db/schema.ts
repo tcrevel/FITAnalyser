@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, bytea } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -23,7 +23,7 @@ export const fitFiles = pgTable("fit_files", {
   datasetId: uuid("dataset_id")
     .references(() => datasets.id, { onDelete: 'cascade' })
     .notNull(),
-  content: bytea("content").notNull(), // Store the actual file content
+  filePath: text("file_path").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
