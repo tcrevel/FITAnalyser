@@ -5,11 +5,7 @@ import * as schema from "@db/schema";
 const { Pool } = postgres;
 
 const pool = new Pool({
-  host: process.env.EXTERNAL_PG_HOST,
-  database: process.env.EXTERNAL_PG_DATABASE,
-  user: process.env.EXTERNAL_PG_USER,
-  password: process.env.EXTERNAL_PG_PASSWORD,
-  port: parseInt(process.env.EXTERNAL_PG_PORT || '5432'),
+  connectionString: process.env.DATABASE_URL,
   ssl: false
 });
 
