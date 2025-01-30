@@ -12,33 +12,49 @@ DROP INDEX IF EXISTS idx_datasets_created_at;
 DROP INDEX IF EXISTS idx_fit_files_created_at;
 DROP INDEX IF EXISTS idx_dataset_statistics;
 
--- Create users table
+-- Create users table - Base for usersRelations
+-- export const usersRelations = relations(users, ({ many }) => ({
+--   datasets: many(datasets),
+-- }));
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,  -- Firebase UID
   email TEXT UNIQUE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- Create datasets table
+-- Create datasets table with user relation
+-- export const datasetsRelations = relations(datasets, ({ one, many }) => ({
+--   user: one(users, {
+--     fields: [datasets.userId],
+--     references: [users.id],
+--   }),
+--   fitFiles: many(fitFiles),
+-- }));
 CREATE TABLE IF NOT EXISTS datasets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  share_token TEXT,  -- Removed unique constraint temporarily
-  CONSTRAINT valid_name CHECK (length(trim(name)) > 0)  -- Ensure name is not empty
+  share_token TEXT,
+  CONSTRAINT valid_name CHECK (length(trim(name)) > 0)
 );
 
--- Create fit_files table
+-- Create fit_files table with dataset relation
+-- export const fitFilesRelations = relations(fitFiles, ({ one }) => ({
+--   dataset: one(datasets, {
+--     fields: [fitFiles.datasetId],
+--     references: [datasets.id],
+--   }),
+-- }));
 CREATE TABLE IF NOT EXISTS fit_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   dataset_id UUID NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   file_path TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  CONSTRAINT valid_file_name CHECK (length(trim(name)) > 0),  -- Ensure file name is not empty
-  CONSTRAINT valid_file_path CHECK (length(trim(file_path)) > 0)  -- Ensure file path is not empty
+  CONSTRAINT valid_file_name CHECK (length(trim(name)) > 0),
+  CONSTRAINT valid_file_path CHECK (length(trim(file_path)) > 0)
 );
 
 -- Create indexes for better query performance
@@ -70,6 +86,8 @@ COMMENT ON TABLE fit_files IS 'Stores individual FIT file information and paths'
 
 COMMENT ON COLUMN datasets.share_token IS 'Token for sharing datasets with non-authenticated users';
 COMMENT ON COLUMN fit_files.file_path IS 'Path to the stored FIT file in the file system';
+COMMENT ON COLUMN datasets.user_id IS 'Reference to the user who owns this dataset';
+COMMENT ON COLUMN fit_files.dataset_id IS 'Reference to the dataset this file belongs to';
 
 -- Create view for quick access to dataset statistics
 CREATE VIEW dataset_statistics AS
