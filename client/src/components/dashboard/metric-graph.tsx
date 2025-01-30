@@ -48,7 +48,15 @@ const colors = [
 ];
 
 export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphProps) {
-  console.log("MetricGraph render:", { datasets, metricKey, title });
+  console.log(`MetricGraph render for ${title}:`, {
+    datasetsCount: datasets.length,
+    metricKey,
+    sampleData: datasets.map(d => ({
+      name: d.name,
+      recordCount: d.data?.length || 0,
+      hasMetric: d.data?.[0]?.[metricKey] !== undefined
+    }))
+  });
 
   const [refAreaLeft, setRefAreaLeft] = useState("");
   const [refAreaRight, setRefAreaRight] = useState("");
@@ -58,11 +66,25 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
   const [bottom, setBottom] = useState<number | "dataMin">("dataMin");
 
   // Process and validate data
-  const validDatasets = datasets.filter(dataset => 
-    dataset && Array.isArray(dataset.data) && dataset.data.length > 0
-  );
+  const validDatasets = datasets.filter(dataset => {
+    const isValid = dataset && 
+                   Array.isArray(dataset.data) && 
+                   dataset.data.length > 0 &&
+                   dataset.data.some(d => d[metricKey] !== undefined);
 
-  console.log("Valid datasets:", validDatasets.length);
+    if (!isValid) {
+      console.log(`Invalid dataset for ${title}:`, {
+        name: dataset?.name,
+        hasData: Array.isArray(dataset?.data),
+        dataLength: dataset?.data?.length,
+        samplePoint: dataset?.data?.[0]
+      });
+    }
+
+    return isValid;
+  });
+
+  console.log(`${title} - Valid datasets:`, validDatasets.length);
 
   const zoom = useCallback(() => {
     if (refAreaLeft === refAreaRight || !refAreaRight) {
