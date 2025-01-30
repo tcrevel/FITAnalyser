@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuthStore } from "@/lib/auth";
+import { EmailVerification } from "@/components/auth/email-verification";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
@@ -16,5 +17,14 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
-  return user ? <>{children}</> : null;
+  if (!user) {
+    return null;
+  }
+
+  // Show email verification page for unverified users
+  if (!user.emailVerified) {
+    return <EmailVerification />;
+  }
+
+  return <>{children}</>;
 }
