@@ -28,14 +28,14 @@ export function registerRoutes(app: Express): Server {
         return callback(null, true);
       }
 
-      if (allowedOrigins.some(allowedOrigin => origin.startsWith(allowedOrigin))) {
-        console.log('Allowing matched origin:', origin);
+      // Allow Replit domains
+      if (origin.includes('.replit.app') || origin.includes('.replit.dev') || origin.includes('.repl.co')) {
+        console.log('Allowing Replit domain:', origin);
         return callback(null, true);
       }
 
-      // Allow Replit domains in development
-      if (origin.includes('.repl.co') || origin.includes('.replit.dev')) {
-        console.log('Allowing Replit domain:', origin);
+      if (allowedOrigins.some(allowedOrigin => origin.startsWith(allowedOrigin))) {
+        console.log('Allowing matched origin:', origin);
         return callback(null, true);
       }
 
