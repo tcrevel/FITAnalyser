@@ -1,42 +1,28 @@
 import { Router } from "express";
 import { db } from "../db";
 import { datasets, fitFiles } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import multer from "multer";
-import path from "path";
-import type { Request, Response } from "express";
 import { requireAuth } from "../middleware/auth";
-import fs from "fs";
-import { promisify } from "util";
+import { uploadFileToStorage, getFileFromStorage } from "../lib/storage";
+import type { Request, Response } from "express";
 import crypto from 'crypto';
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
   user: {
-    id: string;  // Updated to string for Firebase UID
+    id: string;  // Firebase UID
     email: string;
   };
 }
 
 const router = Router();
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), "uploads", "fit-files");
-fs.mkdirSync(uploadsDir, { recursive: true });
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: uploadsDir,
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
-  },
-});
-
+// Configure multer for memory storage (instead of disk)
 const upload = multer({ 
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/octet-stream" && path.extname(file.originalname).toLowerCase() === '.fit') {
+    if (file.mimetype === "application/octet-stream" && file.originalname.toLowerCase().endsWith('.fit')) {
       cb(null, true);
     } else {
       cb(new Error("Only .fit files are allowed"));
@@ -58,7 +44,19 @@ router.get("/shared/:token", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    res.json(dataset);
+    // Don't expose sensitive data in shared view
+    const sanitizedDataset = {
+      id: dataset.id,
+      name: dataset.name,
+      createdAt: dataset.createdAt,
+      fitFiles: dataset.fitFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        filePath: file.filePath
+      }))
+    };
+
+    res.json(sanitizedDataset);
   } catch (error) {
     console.error("Error fetching shared dataset:", error);
     res.status(500).json({ error: "Failed to fetch shared dataset" });
@@ -70,7 +68,9 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
     const dataset = await db.query.datasets.findFirst({
       where: eq(datasets.shareToken, req.params.token),
       with: {
-        fitFiles: true,
+        fitFiles: {
+          where: eq(fitFiles.id, req.params.fileId)
+        },
       },
     });
 
@@ -78,16 +78,15 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    const file = dataset.fitFiles.find(f => f.id === req.params.fileId);
+    const file = dataset.fitFiles[0];
     if (!file) {
       return res.status(404).json({ error: "File not found" });
     }
 
-    const readFile = promisify(fs.readFile);
-    const buffer = await readFile(file.filePath);
-    const { default: FitParser } = await import('fit-file-parser');
+    const buffer = await getFileFromStorage(file.filePath);
+    const { default: FitParserModule } = await import('fit-file-parser');
 
-    const fitParser = new FitParser({
+    const fitParser = new FitParserModule({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
@@ -127,10 +126,10 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
   }
 });
 
-// Apply auth middleware to all routes
+// Apply auth middleware to all authenticated routes
 router.use(requireAuth);
 
-// Get all datasets with their fit files
+// Get all datasets with their fit files for the authenticated user
 router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userDatasets = await db.query.datasets.findMany({
@@ -147,11 +146,14 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Get a single dataset with its fit files
+// Get a single dataset with its fit files for the authenticated user
 router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: eq(datasets.id, req.params.id),
+      where: and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ),
       with: {
         fitFiles: true,
       },
@@ -161,11 +163,6 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    // Check if the dataset belongs to the authenticated user
-    if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized access to dataset" });
-    }
-
     res.json(dataset);
   } catch (error) {
     console.error("Error fetching dataset:", error);
@@ -173,7 +170,7 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Get the parsed data from a fit file
+// Get the parsed data from a fit file for the authenticated user
 router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
@@ -192,11 +189,11 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
-    const readFile = promisify(fs.readFile);
-    const buffer = await readFile(file.filePath);
-    const { default: FitParser } = await import('fit-file-parser');
+    console.log("Reading file from storage:", file.filePath); // Debug log
+    const buffer = await getFileFromStorage(file.filePath);
+    const { default: FitParserModule } = await import('fit-file-parser');
 
-    const fitParser = new FitParser({
+    const fitParser = new FitParserModule({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
@@ -209,6 +206,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
           console.error("FIT parse error:", error);
           reject(error);
         } else {
+          console.log("FIT file parsed successfully, records:", data.records?.length); // Debug log
           resolve(data);
         }
       });
@@ -231,15 +229,24 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
 
     res.json(processedData);
   } catch (error: any) {
-    console.error("Error parsing fit file:", error);
-    res.status(500).json({ error: `Failed to parse fit file: ${error.message}` });
+    console.error("Error parsing fit file:", {
+      error: error.message,
+      stack: error.stack,
+      fileId: req.params.id
+    });
+
+    res.status(500).json({ 
+      error: `Failed to parse fit file: ${error.message}`,
+      details: error.stack
+    });
   }
 });
 
-// Upload multiple fit files to a new dataset
+// Upload multiple fit files to a new dataset for the authenticated user
 router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+    const files = req.files as Express.Multer.File[];
+    if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ error: "No files uploaded" });
     }
 
@@ -253,16 +260,27 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
       })
       .returning();
 
-    // Add all files to the dataset
+    console.log("Created new dataset:", newDataset); // Debug log
+
+    // Upload files to Firebase Storage and add them to the dataset
     const insertedFiles = await Promise.all(
-      (req.files as Express.Multer.File[]).map(async (file) => {
+      files.map(async (file) => {
+        console.log("Processing uploaded file:", {  // Debug log
+          originalName: file.originalname,
+          size: file.size
+        });
+
+        // Upload file to Firebase Storage
+        const storagePath = await uploadFileToStorage(file.buffer, file.originalname);
+
         const [newFile] = await db.insert(fitFiles)
           .values({
             name: file.originalname,
             datasetId: newDataset.id,
-            filePath: file.path,
+            filePath: storagePath,
           })
           .returning();
+
         return newFile;
       })
     );
@@ -277,11 +295,14 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
   }
 });
 
-// Delete a dataset and all its files
+// Delete a dataset and all its files for the authenticated user
 router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: eq(datasets.id, req.params.id),
+      where: and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ),
       with: {
         fitFiles: true,
       },
@@ -291,23 +312,7 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    // Check if the dataset belongs to the authenticated user
-    if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized deletion attempt" });
-    }
-
-    // Delete all physical files
-    await Promise.all(
-      dataset.fitFiles.map(async (file) => {
-        try {
-          await fs.promises.unlink(file.filePath);
-        } catch (error) {
-          console.error("Error deleting file from disk:", error);
-        }
-      })
-    );
-
-    // Delete the dataset (cascade will delete associated fit files)
+    // Delete dataset (cascade will delete associated fit files)
     await db.delete(datasets)
       .where(eq(datasets.id, dataset.id));
 
@@ -318,25 +323,26 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Update dataset name
+// Update dataset name for the authenticated user
 router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: eq(datasets.id, req.params.id),
+      where: and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ),
     });
 
     if (!dataset) {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    // Check if the dataset belongs to the authenticated user
-    if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized update attempt" });
-    }
-
     const [updatedDataset] = await db.update(datasets)
       .set({ name: req.body.name })
-      .where(eq(datasets.id, req.params.id))
+      .where(and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ))
       .returning();
 
     res.json(updatedDataset);
@@ -346,68 +352,34 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-router.post("/:id/share", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+// Share a dataset for the authenticated user
+router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: eq(datasets.id, req.params.id),
+      where: and(
+        eq(datasets.id, req.params.id),
+        eq(datasets.userId, req.user.id)
+      ),
     });
 
     if (!dataset) {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    if (dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
-
     const shareToken = dataset.shareToken || crypto.randomUUID();
 
     const [updatedDataset] = await db.update(datasets)
       .set({ shareToken })
-      .where(eq(datasets.id, dataset.id))
+      .where(and(
+        eq(datasets.id, dataset.id),
+        eq(datasets.userId, req.user.id)
+      ))
       .returning();
 
     res.json({ shareToken: updatedDataset.shareToken });
   } catch (error) {
     console.error("Error sharing dataset:", error);
     res.status(500).json({ error: "Failed to share dataset" });
-  }
-});
-
-// Delete a single file from a dataset
-router.delete("/:datasetId/file/:fileId", async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const file = await db.query.fitFiles.findFirst({
-      where: eq(fitFiles.id, req.params.fileId),
-      with: {
-        dataset: true,
-      },
-    });
-
-    if (!file) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    // Check if the file's dataset belongs to the authenticated user
-    if (file.dataset.userId !== req.user.id) {
-      return res.status(403).json({ error: "Unauthorized deletion attempt" });
-    }
-
-    // Delete the physical file
-    try {
-      await fs.promises.unlink(file.filePath);
-    } catch (error) {
-      console.error("Error deleting file from disk:", error);
-    }
-
-    // Delete the file record from database
-    await db.delete(fitFiles)
-      .where(eq(fitFiles.id, file.id));
-
-    res.json({ message: "File deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting file:", error);
-    res.status(500).json({ error: "Failed to delete file" });
   }
 });
 

@@ -48,6 +48,16 @@ const colors = [
 ];
 
 export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphProps) {
+  console.log(`MetricGraph render for ${title}:`, {
+    datasetsCount: datasets.length,
+    metricKey,
+    sampleData: datasets.map(d => ({
+      name: d.name,
+      recordCount: d.data?.length || 0,
+      hasMetric: d.data?.[0]?.[metricKey] !== undefined
+    }))
+  });
+
   const [refAreaLeft, setRefAreaLeft] = useState("");
   const [refAreaRight, setRefAreaRight] = useState("");
   const [left, setLeft] = useState<number | "dataMin">("dataMin");
@@ -55,37 +65,69 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
   const [top, setTop] = useState<number | "dataMax">("dataMax");
   const [bottom, setBottom] = useState<number | "dataMin">("dataMin");
 
-  const zoom = () => {
+  // Process and validate data
+  const validDatasets = datasets.filter(dataset => {
+    const isValid = dataset && 
+                   Array.isArray(dataset.data) && 
+                   dataset.data.length > 0 &&
+                   dataset.data.some(d => d[metricKey] !== undefined);
+
+    if (!isValid) {
+      console.log(`Invalid dataset for ${title}:`, {
+        name: dataset?.name,
+        hasData: Array.isArray(dataset?.data),
+        dataLength: dataset?.data?.length,
+        samplePoint: dataset?.data?.[0]
+      });
+    }
+
+    return isValid;
+  });
+
+  console.log(`${title} - Valid datasets:`, validDatasets.length);
+
+  const zoom = useCallback(() => {
     if (refAreaLeft === refAreaRight || !refAreaRight) {
       setRefAreaLeft("");
       setRefAreaRight("");
       return;
     }
 
-    let leftNum = parseInt(refAreaLeft);
-    let rightNum = parseInt(refAreaRight);
+    const leftNum = parseInt(refAreaLeft);
+    const rightNum = parseInt(refAreaRight);
 
-    if (leftNum > rightNum) {
-      [leftNum, rightNum] = [rightNum, leftNum];
+    if (isNaN(leftNum) || isNaN(rightNum)) {
+      setRefAreaLeft("");
+      setRefAreaRight("");
+      return;
     }
 
+    let [finalLeft, finalRight] = leftNum > rightNum ? [rightNum, leftNum] : [leftNum, rightNum];
+
     // Find min and max values across all datasets in the selected range
-    const allValues = datasets.flatMap(dataset => 
+    const allValues = validDatasets.flatMap(dataset => 
       dataset.data
-        .filter((_, index) => index >= leftNum && index <= rightNum)
-        .map(d => d[metricKey])
+        .filter((_, index) => index >= finalLeft && index <= finalRight)
+        .map(d => Number(d[metricKey]))
+        .filter(val => !isNaN(val))
     );
+
+    if (allValues.length === 0) {
+      setRefAreaLeft("");
+      setRefAreaRight("");
+      return;
+    }
 
     const maxValue = Math.max(...allValues);
     const minValue = Math.min(...allValues);
 
     setRefAreaLeft("");
     setRefAreaRight("");
-    setLeft(leftNum);
-    setRight(rightNum);
+    setLeft(finalLeft);
+    setRight(finalRight);
     setBottom(minValue);
     setTop(maxValue);
-  };
+  }, [validDatasets, metricKey, refAreaLeft, refAreaRight]);
 
   const zoomOut = () => {
     setLeft("dataMin");
@@ -93,6 +135,22 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
     setTop("dataMax");
     setBottom("dataMin");
   };
+
+  if (validDatasets.length === 0) {
+    console.log("No valid data available for chart");
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full">
@@ -138,7 +196,7 @@ export function MetricGraph({ datasets, metricKey, title, unit }: MetricGraphPro
                 ]}
               />
               <Legend />
-              {datasets.map((dataset, index) => (
+              {validDatasets.map((dataset, index) => (
                 <Line
                   key={dataset.name}
                   data={dataset.data}

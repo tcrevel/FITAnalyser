@@ -85,9 +85,16 @@ export default function DatasetView() {
         throw new Error("Not authenticated");
       }
 
+      console.log("Fetching data for files:", selectedFileIds); // Debug log
+
       const dataPromises = selectedFileIds.map(async (fileId) => {
         const file = dataset?.fitFiles.find((f) => f.id === fileId);
-        if (!file) return null;
+        if (!file) {
+          console.log("File not found in dataset:", fileId); // Debug log
+          return null;
+        }
+
+        console.log("Fetching data for file:", file.name, fileId); // Debug log
 
         const response = await fetch(`/api/fit-files/file/${fileId}/data`, {
           headers: {
@@ -96,10 +103,18 @@ export default function DatasetView() {
         });
 
         if (!response.ok) {
+          console.error("Failed to fetch file data:", fileId, await response.text()); // Debug log
           throw new Error("Failed to fetch file data");
         }
 
         const data = await response.json();
+        console.log("Received data for file:", file.name, "records:", data.length); // Debug log
+
+        if (!Array.isArray(data) || data.length === 0) {
+          console.log("No data or invalid data received for file:", file.name); // Debug log
+          return null;
+        }
+
         return {
           name: file.name,
           data,
@@ -107,9 +122,9 @@ export default function DatasetView() {
       });
 
       const results = await Promise.all(dataPromises);
-      return results.filter(
-        (result): result is ProcessedDataSet => result !== null
-      );
+      const validResults = results.filter((result): result is ProcessedDataSet => result !== null);
+      console.log("Total valid datasets:", validResults.length); // Debug log
+      return validResults;
     },
     enabled: selectedFileIds.length > 0 && !!dataset,
   });
