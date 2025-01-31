@@ -18,48 +18,98 @@ export const requireAuth = async (
 ) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.log('Auth failed: No bearer token provided');
-      return res.status(401).json({ message: "No token provided" });
+
+    if (!authHeader) {
+      console.log('Auth failed: No authorization header');
+      return res.status(401).json({ 
+        message: "Authentication required",
+        code: 'auth/no-token'
+      });
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      console.log('Auth failed: Invalid authorization format');
+      return res.status(401).json({ 
+        message: "Invalid authorization format. Use Bearer token",
+        code: 'auth/invalid-format'
+      });
     }
 
     const token = authHeader.split('Bearer ')[1];
-    console.log('Verifying token...');
-    const decodedToken = await getAuth().verifyIdToken(token);
-    console.log('Token verified successfully for user:', decodedToken.uid);
+    if (!token) {
+      console.log('Auth failed: Empty token');
+      return res.status(401).json({ 
+        message: "No token provided",
+        code: 'auth/empty-token'
+      });
+    }
+
+    let decodedToken;
+    try {
+      console.log('Verifying token...');
+      decodedToken = await getAuth().verifyIdToken(token);
+      console.log('Token verified successfully for user:', decodedToken.uid);
+    } catch (verifyError: any) {
+      console.error('Token verification failed:', verifyError);
+      return res.status(401).json({
+        message: verifyError.message || "Invalid authentication token",
+        code: verifyError.code || 'auth/invalid-token'
+      });
+    }
+
+    if (!decodedToken.email) {
+      console.log('Auth failed: No email in token');
+      return res.status(401).json({ 
+        message: "Invalid user token - no email found",
+        code: 'auth/no-email'
+      });
+    }
 
     // Check for existing user by either ID or email
     let user = await db.query.users.findFirst({
       where: or(
         eq(users.id, decodedToken.uid),
-        eq(users.email, decodedToken.email || '')
+        eq(users.email, decodedToken.email)
       )
     });
 
     // If no user exists, create a new one
     if (!user) {
       console.log('Creating new user for:', decodedToken.email);
-      const [newUser] = await db
-        .insert(users)
-        .values({
-          id: decodedToken.uid,
-          email: decodedToken.email || '',
-        })
-        .returning();
-      user = newUser;
+      try {
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            id: decodedToken.uid,
+            email: decodedToken.email,
+          })
+          .returning();
+        user = newUser;
+      } catch (dbError: any) {
+        console.error('Database error creating user:', dbError);
+        return res.status(500).json({ 
+          message: "Failed to create user record",
+          code: 'auth/db-error'
+        });
+      }
     } 
     // If user exists but has a different ID (email exists but different provider)
     else if (user.id !== decodedToken.uid) {
       console.log('Updating user ID for:', decodedToken.email);
-      // Update the user's ID to match the Firebase UID
-      const [updatedUser] = await db
-        .update(users)
-        .set({
-          id: decodedToken.uid,
-        })
-        .where(eq(users.email, decodedToken.email || ''))
-        .returning();
-      user = updatedUser;
+      try {
+        const [updatedUser] = await db
+          .update(users)
+          .set({ id: decodedToken.uid })
+          .where(eq(users.email, decodedToken.email))
+          .returning();
+        user = updatedUser;
+      } catch (dbError: any) {
+        console.error('Database error updating user:', dbError);
+        return res.status(500).json({ 
+          message: "Failed to update user record",
+          code: 'auth/db-error'
+        });
+      }
     }
 
     req.user = {
@@ -76,20 +126,10 @@ export const requireAuth = async (
       stack: error.stack
     });
 
-    // Handle specific Firebase Auth errors
-    if (error.code === 'auth/id-token-expired') {
-      return res.status(401).json({ message: "Token expired. Please sign in again." });
-    }
-    if (error.code === 'auth/id-token-revoked') {
-      return res.status(401).json({ message: "Token has been revoked. Please sign in again." });
-    }
-    if (error.code === 'auth/invalid-id-token') {
-      return res.status(401).json({ message: "Invalid token. Please sign in again." });
-    }
-
+    // Return a generic error if we haven't caught it specifically above
     res.status(401).json({ 
-      message: "Authentication failed",
-      error: error.message
+      message: "Authentication failed: " + (error.message || "Unknown error"),
+      code: error.code || 'auth/unknown-error'
     });
   }
 };
