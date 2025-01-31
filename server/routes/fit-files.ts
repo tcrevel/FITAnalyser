@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db";
 import { datasets, fitFiles } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import type { Request, Response } from "express";
@@ -13,7 +13,7 @@ import crypto from 'crypto';
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
   user: {
-    id: string;  // Firebase UID
+    id: string;  // Updated to string for Firebase UID
     email: string;
   };
 }
@@ -127,10 +127,10 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
   }
 });
 
-// Apply auth middleware to all authenticated routes
+// Apply auth middleware to all routes
 router.use(requireAuth);
 
-// Get all datasets with their fit files for the authenticated user
+// Get all datasets with their fit files
 router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userDatasets = await db.query.datasets.findMany({
@@ -147,14 +147,11 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Get a single dataset with its fit files for the authenticated user
+// Get a single dataset with its fit files
 router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: and(
-        eq(datasets.id, req.params.id),
-        eq(datasets.userId, req.user.id)
-      ),
+      where: eq(datasets.id, req.params.id),
       with: {
         fitFiles: true,
       },
@@ -164,6 +161,11 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
+    // Check if the dataset belongs to the authenticated user
+    if (dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized access to dataset" });
+    }
+
     res.json(dataset);
   } catch (error) {
     console.error("Error fetching dataset:", error);
@@ -171,7 +173,7 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Get the parsed data from a fit file for the authenticated user
+// Get the parsed data from a fit file
 router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
@@ -234,7 +236,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
   }
 });
 
-// Upload multiple fit files to a new dataset for the authenticated user
+// Upload multiple fit files to a new dataset
 router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
@@ -275,14 +277,11 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
   }
 });
 
-// Delete a dataset and all its files for the authenticated user
+// Delete a dataset and all its files
 router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: and(
-        eq(datasets.id, req.params.id),
-        eq(datasets.userId, req.user.id)
-      ),
+      where: eq(datasets.id, req.params.id),
       with: {
         fitFiles: true,
       },
@@ -290,6 +289,11 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
 
     if (!dataset) {
       return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    // Check if the dataset belongs to the authenticated user
+    if (dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized deletion attempt" });
     }
 
     // Delete all physical files
@@ -314,18 +318,20 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Update dataset name for the authenticated user
+// Update dataset name
 router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: and(
-        eq(datasets.id, req.params.id),
-        eq(datasets.userId, req.user.id)
-      ),
+      where: eq(datasets.id, req.params.id),
     });
 
     if (!dataset) {
       return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    // Check if the dataset belongs to the authenticated user
+    if (dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized update attempt" });
     }
 
     const [updatedDataset] = await db.update(datasets)
@@ -340,18 +346,18 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Share a dataset for the authenticated user
-router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/:id/share", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
-      where: and(
-        eq(datasets.id, req.params.id),
-        eq(datasets.userId, req.user.id)
-      ),
+      where: eq(datasets.id, req.params.id),
     });
 
     if (!dataset) {
       return res.status(404).json({ error: "Dataset not found" });
+    }
+
+    if (dataset.userId !== req.user.id) {
+      return res.status(403).json({ error: "Unauthorized" });
     }
 
     const shareToken = dataset.shareToken || crypto.randomUUID();
@@ -368,7 +374,7 @@ router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Delete a single file from a dataset for the authenticated user
+// Delete a single file from a dataset
 router.delete("/:datasetId/file/:fileId", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
