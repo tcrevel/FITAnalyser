@@ -9,13 +9,13 @@ const app = initializeApp({
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   }),
-  storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com` // Use project ID for bucket name
+  storageBucket: 'fit-analyser.firebasestorage.app' // Use specific bucket URL
 });
 
 // Export the auth instance
 export const auth = getAuth(app);
 
 // Initialize storage
-console.log('Initializing Firebase Storage with bucket:', `${process.env.FIREBASE_PROJECT_ID}.appspot.com`);
+console.log('Initializing Firebase Storage with bucket: fit-analyser.firebasestorage.app');
 export const storage = getStorage(app);
 export const bucket = storage.bucket();
