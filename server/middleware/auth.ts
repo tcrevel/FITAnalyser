@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "firebase-admin/auth";
-import { db } from "../db";
+import { db, testConnection } from "../db";
 import { users } from "@db/schema";
 import { eq, or } from "drizzle-orm";
 
@@ -65,60 +65,78 @@ export const requireAuth = async (
       });
     }
 
-    // Check for existing user by either ID or email
-    let user = await db.query.users.findFirst({
-      where: or(
-        eq(users.id, decodedToken.uid),
-        eq(users.email, decodedToken.email)
-      )
-    });
-
-    // If no user exists, create a new one
-    if (!user) {
-      console.log('Creating new user for:', decodedToken.email);
-      try {
-        const [newUser] = await db
-          .insert(users)
-          .values({
-            id: decodedToken.uid,
-            email: decodedToken.email,
-          })
-          .returning();
-        user = newUser;
-      } catch (dbError: any) {
-        console.error('Database error creating user:', dbError);
-        return res.status(500).json({ 
-          message: "Failed to create user record",
-          code: 'auth/db-error'
-        });
-      }
-    } 
-    // If user exists but has a different ID (email exists but different provider)
-    else if (user.id !== decodedToken.uid) {
-      console.log('Updating user ID for:', decodedToken.email);
-      try {
-        const [updatedUser] = await db
-          .update(users)
-          .set({ id: decodedToken.uid })
-          .where(eq(users.email, decodedToken.email))
-          .returning();
-        user = updatedUser;
-      } catch (dbError: any) {
-        console.error('Database error updating user:', dbError);
-        return res.status(500).json({ 
-          message: "Failed to update user record",
-          code: 'auth/db-error'
-        });
-      }
+    // Verify database connection before proceeding
+    const isConnected = await testConnection();
+    if (!isConnected) {
+      console.error('Database connection failed');
+      return res.status(503).json({ 
+        message: "Database connection error",
+        code: 'database/connection-error'
+      });
     }
 
-    req.user = {
-      id: user.id,
-      email: user.email,
-    };
+    try {
+      // Check for existing user by either ID or email
+      let user = await db.query.users.findFirst({
+        where: or(
+          eq(users.id, decodedToken.uid),
+          eq(users.email, decodedToken.email)
+        )
+      });
 
-    console.log('Auth successful for user:', user.email);
-    next();
+      // If no user exists, create a new one
+      if (!user) {
+        console.log('Creating new user for:', decodedToken.email);
+        try {
+          const [newUser] = await db
+            .insert(users)
+            .values({
+              id: decodedToken.uid,
+              email: decodedToken.email,
+            })
+            .returning();
+          user = newUser;
+        } catch (dbError: any) {
+          console.error('Database error creating user:', dbError);
+          return res.status(500).json({ 
+            message: "Failed to create user record",
+            code: 'auth/db-error'
+          });
+        }
+      } 
+      // If user exists but has a different ID (email exists but different provider)
+      else if (user.id !== decodedToken.uid) {
+        console.log('Updating user ID for:', decodedToken.email);
+        try {
+          const [updatedUser] = await db
+            .update(users)
+            .set({ id: decodedToken.uid })
+            .where(eq(users.email, decodedToken.email))
+            .returning();
+          user = updatedUser;
+        } catch (dbError: any) {
+          console.error('Database error updating user:', dbError);
+          return res.status(500).json({ 
+            message: "Failed to update user record",
+            code: 'auth/db-error'
+          });
+        }
+      }
+
+      req.user = {
+        id: user.id,
+        email: user.email,
+      };
+
+      console.log('Auth successful for user:', user.email);
+      next();
+    } catch (dbError: any) {
+      console.error('Database operation failed:', dbError);
+      return res.status(500).json({ 
+        message: "Database operation failed",
+        code: 'database/operation-error'
+      });
+    }
   } catch (error: any) {
     console.error("Auth middleware error:", {
       message: error.message,

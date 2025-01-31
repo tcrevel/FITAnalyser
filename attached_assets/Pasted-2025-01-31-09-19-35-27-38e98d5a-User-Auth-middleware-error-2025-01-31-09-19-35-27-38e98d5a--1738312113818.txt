@@ -1,0 +1,104 @@
+2025-01-31 09:19:35.27
+38e98d5a
+User
+Auth middleware error: {
+2025-01-31 09:19:35.27
+38e98d5a
+User
+message: "The requested endpoint could not be found, or you don't have access to it. Please check the provided ID and try again.",
+2025-01-31 09:19:35.27
+38e98d5a
+User
+code: 'XX000',
+2025-01-31 09:19:35.27
+38e98d5a
+User
+stack: "error: The requested endpoint could not be found, or you don't have access to it. Please check the provided ID and try again.\n" +
+2025-01-31 09:19:35.27
+38e98d5a
+User
+' at /home/runner/workspace/node_modules/pg-pool/index.js:45:11\n' +
+2025-01-31 09:19:35.27
+38e98d5a
+User
+' at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n' +
+2025-01-31 09:19:35.27
+38e98d5a
+User
+' at async file:///home/runner/workspace/node_modules/drizzle-orm/node-postgres/session.js:83:22\n' +
+2025-01-31 09:19:35.27
+38e98d5a
+User
+' at async requireAuth (file:///home/runner/workspace/dist/index.js:143:16)'
+2025-01-31 09:19:35.27
+38e98d5a
+User
+}
+2025-01-31 09:19:35.28
+38e98d5a
+User
+8:19:35 AM [express] GET /api/fit-files 401 in 278ms :: {"message":"Authentication failed: The reque…
+2025-01-31 09:23:07.16
+5a23463f
+System
+system: received signal terminated
+2025-01-31 09:23:07.17
+5a23463f
+System
+command finished with error [npm run start]: signal: terminated
+2025-01-31 09:23:07.19
+5a23463f
+System
+main done, exiting
+2025-01-31 09:27:46.93
+38e98d5a
+User
+Allowing Replit domain: https://fitanalyser.replit.app
+2025-01-31 09:27:46.93
+38e98d5a
+User
+Verifying token...
+2025-01-31 09:27:46.93
+38e98d5a
+User
+Token verified successfully for user: v2Amq2kCPKQoBLJuTXvPVC55sHv2
+2025-01-31 09:27:47.14
+38e98d5a
+User
+Auth middleware error: {
+2025-01-31 09:27:47.14
+38e98d5a
+User
+message: "The requested endpoint could not be found, or you don't have access to it. Please check the provided ID and try again.",
+2025-01-31 09:27:47.14
+38e98d5a
+User
+code: 'XX000',
+2025-01-31 09:27:47.14
+38e98d5a
+User
+stack: "error: The requested endpoint could not be found, or you don't have access to it. Please check the provided ID and try again.\n" +
+2025-01-31 09:27:47.14
+38e98d5a
+User
+' at /home/runner/workspace/node_modules/pg-pool/index.js:45:11\n' +
+2025-01-31 09:27:47.14
+38e98d5a
+User
+' at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n' +
+2025-01-31 09:27:47.14
+38e98d5a
+User
+' at async file:///home/runner/workspace/node_modules/drizzle-orm/node-postgres/session.js:83:22\n' +
+2025-01-31 09:27:47.14
+38e98d5a
+User
+' at async requireAuth (file:///home/runner/workspace/dist/index.js:143:16)'
+2025-01-31 09:27:47.14
+38e98d5a
+User
+}
+2025-01-31 09:27:47.14
+38e98d5a
+User
+8:27:47 AM [express] POST /api/fit-files 401 in 215ms :: {"message":"Authentication failed: The requ…
