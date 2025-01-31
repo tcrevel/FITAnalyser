@@ -15,7 +15,7 @@ const app = initializeApp({
 export const auth = getAuth(app);
 
 // Initialize storage with explicit bucket
-const storageBucket = `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
+const storageBucket = 'fit-analyser.firebasestorage.app';
 console.log('Initializing Firebase Storage with bucket:', storageBucket);
 export const storage = getStorage(app);
 export const bucket = storage.bucket(storageBucket);
