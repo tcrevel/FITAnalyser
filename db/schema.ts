@@ -14,7 +14,7 @@ export const datasets = pgTable("datasets", {
   userId: text("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  shareToken: text("share_token"),
+  shareToken: text("share_token"), // Remove unique constraint temporarily
 });
 
 export const fitFiles = pgTable("fit_files", {
@@ -23,7 +23,7 @@ export const fitFiles = pgTable("fit_files", {
   datasetId: uuid("dataset_id")
     .references(() => datasets.id, { onDelete: 'cascade' })
     .notNull(),
-  fileUrl: text("file_url").notNull(), // Changed from filePath to fileUrl
+  filePath: text("file_path").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
