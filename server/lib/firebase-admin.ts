@@ -8,14 +8,14 @@ const app = initializeApp({
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  })
+  }),
+  storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com` // Use project ID for bucket name
 });
 
 // Export the auth instance
 export const auth = getAuth(app);
 
-// Initialize storage with explicit bucket
-const storageBucket = 'fit-analyser.firebasestorage.app';
-console.log('Initializing Firebase Storage with bucket:', storageBucket);
+// Initialize storage
+console.log('Initializing Firebase Storage with bucket:', `${process.env.FIREBASE_PROJECT_ID}.appspot.com`);
 export const storage = getStorage(app);
-export const bucket = storage.bucket(storageBucket);
+export const bucket = storage.bucket();
