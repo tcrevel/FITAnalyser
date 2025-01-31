@@ -8,10 +8,14 @@ const app = initializeApp({
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  }),
-  storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
+  })
 });
 
 // Export the auth instance
 export const auth = getAuth(app);
+
+// Initialize storage with explicit bucket
+const storageBucket = `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
+console.log('Initializing Firebase Storage with bucket:', storageBucket);
 export const storage = getStorage(app);
+export const bucket = storage.bucket(storageBucket);

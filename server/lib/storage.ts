@@ -1,45 +1,57 @@
-import { storage } from './firebase-admin';
+import { bucket } from './firebase-admin';
 import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function uploadFileToStorage(fileBuffer: Buffer, originalName: string): Promise<string> {
-  const bucket = storage.bucket();
-  const filename = `fit-files/${uuidv4()}-${originalName}`;
-  const file = bucket.file(filename);
-  
-  const stream = file.createWriteStream({
-    metadata: {
-      contentType: 'application/octet-stream',
-    },
-    resumable: false
-  });
+  try {
+    const filename = `fit-files/${uuidv4()}-${originalName}`;
+    const file = bucket.file(filename);
 
-  return new Promise((resolve, reject) => {
-    stream.on('error', (error) => {
-      reject(error);
+    const stream = file.createWriteStream({
+      metadata: {
+        contentType: 'application/octet-stream',
+      },
+      resumable: false
     });
 
-    stream.on('finish', () => {
-      resolve(filename);
-    });
+    return new Promise((resolve, reject) => {
+      stream.on('error', (error) => {
+        console.error('Error uploading to Firebase Storage:', error);
+        reject(error);
+      });
 
-    const readable = new Readable();
-    readable._read = () => {}; // _read is required but you can noop it
-    readable.push(fileBuffer);
-    readable.push(null);
-    readable.pipe(stream);
-  });
+      stream.on('finish', () => {
+        console.log('Successfully uploaded file to Firebase Storage:', filename);
+        resolve(filename);
+      });
+
+      const readable = new Readable();
+      readable._read = () => {}; // _read is required but you can noop it
+      readable.push(fileBuffer);
+      readable.push(null);
+      readable.pipe(stream);
+    });
+  } catch (error) {
+    console.error('Error in uploadFileToStorage:', error);
+    throw error;
+  }
 }
 
 export async function getFileFromStorage(filePath: string): Promise<Buffer> {
-  const bucket = storage.bucket();
-  const file = bucket.file(filePath);
-  
-  const [exists] = await file.exists();
-  if (!exists) {
-    throw new Error('File not found');
-  }
+  try {
+    console.log('Fetching file from Firebase Storage:', filePath);
+    const file = bucket.file(filePath);
 
-  const [fileContents] = await file.download();
-  return fileContents;
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new Error('File not found in Firebase Storage');
+    }
+
+    const [fileContents] = await file.download();
+    console.log('Successfully downloaded file from Firebase Storage:', filePath);
+    return fileContents;
+  } catch (error) {
+    console.error('Error in getFileFromStorage:', error);
+    throw error;
+  }
 }

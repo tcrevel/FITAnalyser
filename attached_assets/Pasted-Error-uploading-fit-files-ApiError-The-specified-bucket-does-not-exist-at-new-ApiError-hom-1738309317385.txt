@@ -1,0 +1,89 @@
+Error uploading fit files: ApiError: The specified bucket does not exist.
+    at new ApiError (/home/runner/workspace/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js:124:15)
+    at Util.parseHttpRespBody (/home/runner/workspace/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js:263:38)
+    at Util.handleResp (/home/runner/workspace/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js:203:30)
+    at /home/runner/workspace/node_modules/@google-cloud/storage/build/cjs/src/nodejs-common/util.js:593:22
+    at onResponse (/home/runner/workspace/node_modules/retry-request/index.js:259:7)
+    at <anonymous> (/home/runner/workspace/node_modules/teeny-request/src/index.ts:244:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+  code: 404,
+  errors: [
+    {
+      message: 'The specified bucket does not exist.',
+      domain: 'global',
+      reason: 'notFound'
+    }
+  ],
+  response: PassThrough {
+    _events: {
+      close: undefined,
+      error: [Array],
+      prefinish: [Function: prefinish],
+      finish: undefined,
+      drain: undefined,
+      data: [Function (anonymous)],
+      end: [Function (anonymous)],
+      readable: undefined,
+      unpipe: undefined
+    },
+    _readableState: ReadableState {
+      highWaterMark: 16384,
+      buffer: [],
+      bufferIndex: 0,
+      length: 0,
+      pipes: [],
+      awaitDrainWriters: null,
+      [Symbol(kState)]: 194512764
+    },
+    _writableState: WritableState {
+      highWaterMark: 16384,
+      length: 0,
+      corked: 0,
+      onwrite: [Function: bound onwrite],
+      writelen: 0,
+      bufferedIndex: 0,
+      pendingcb: 0,
+      [Symbol(kState)]: 1091466620,
+      [Symbol(kBufferedValue)]: null,
+      [Symbol(kWriteCbValue)]: null
+    },
+    allowHalfOpen: true,
+    _maxListeners: undefined,
+    _eventsCount: 4,
+    statusCode: 404,
+    statusMessage: 'Not Found',
+    request: {
+      agent: [Agent],
+      headers: [Object],
+      href: 'https://storage.googleapis.com/upload/storage/v1/b/fit-analyser.appspot.com/o?uploadType=multipart&name=fit-files%2Ff4ffa406-1a76-4d7b-a37c-94a77af5e56c-Z2_%2B_sprint.fit'
+    },
+    body: '{\n' +
+      '  "error": {\n' +
+      '    "code": 404,\n' +
+      '    "message": "The specified bucket does not exist.",\n' +
+      '    "errors": [\n' +
+      '      {\n' +
+      '        "message": "The specified bucket does not exist.",\n' +
+      '        "domain": "global",\n' +
+      '        "reason": "notFound"\n' +
+      '      }\n' +
+      '    ]\n' +
+      '  }\n' +
+      '}\n',
+    headers: {
+      'cache-control': 'no-cache, no-store, max-age=0, must-revalidate',
+      'content-length': '247',
+      'content-type': 'text/html; charset=UTF-8',
+      date: 'Fri, 31 Jan 2025 07:41:39 GMT',
+      expires: 'Mon, 01 Jan 1990 00:00:00 GMT',
+      pragma: 'no-cache',
+      server: 'UploadServer',
+      vary: 'Origin, X-Origin',
+      'x-guploader-uploadid': 'AFIdbgTzQN4FVRhOZKdQK1usw_dB6bhTgWUvYJN_ZP0_WTEOOD7VCuMQBQ3KSQiUpZWi1PWy'
+    },
+    toJSON: [Function: toJSON],
+    [Symbol(shapeMode)]: true,
+    [Symbol(kCapture)]: false,
+    [Symbol(kCallback)]: null
+  }
+}
