@@ -7,7 +7,7 @@ import { requireAuth } from "../middleware/auth";
 import { uploadFileToStorage, getFileFromStorage } from "../lib/storage";
 import type { Request, Response } from "express";
 import crypto from 'crypto';
-import FitParser from 'fit-file-parser';
+import { default as FitParser } from 'fit-file-parser';
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
@@ -85,6 +85,8 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
     }
 
     const buffer = await getFileFromStorage(file.filePath);
+    console.log("Creating FIT parser instance...");
+
     const fitParser = new FitParser({
       force: true,
       speedUnit: 'km/h',
@@ -92,15 +94,22 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
       elapsedRecordField: true,
     });
 
-    const parsedData: any = await new Promise((resolve, reject) => {
-      fitParser.parse(buffer, (error: Error, data: any) => {
-        if (error) {
-          console.error("FIT parse error:", error);
-          reject(error);
-        } else {
-          resolve(data);
-        }
-      });
+    console.log("Parsing FIT file...");
+    const parsedData = await new Promise((resolve, reject) => {
+      try {
+        fitParser.parse(buffer, (error: Error, data: any) => {
+          if (error) {
+            console.error("FIT parse error:", error);
+            reject(error);
+          } else {
+            console.log("Successfully parsed FIT file, records:", data.records?.length);
+            resolve(data);
+          }
+        });
+      } catch (parseError) {
+        console.error("Error during FIT parsing:", parseError);
+        reject(parseError);
+      }
     });
 
     const records = parsedData.records || [];
@@ -120,8 +129,15 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
 
     res.json(processedData);
   } catch (error: any) {
-    console.error("Error parsing shared fit file:", error);
-    res.status(500).json({ error: `Failed to parse fit file: ${error.message}` });
+    console.error("Error parsing shared fit file:", {
+      error: error.message,
+      stack: error.stack,
+      fileId: req.params.fileId
+    });
+    res.status(500).json({ 
+      error: `Failed to parse fit file: ${error.message}`,
+      details: error.stack
+    });
   }
 });
 
@@ -183,13 +199,14 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       return res.status(404).json({ error: "File not found" });
     }
 
-    // Check if the file's dataset belongs to the authenticated user
     if (file.dataset.userId !== req.user.id) {
       return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
     console.log("Reading file from storage:", file.filePath);
     const buffer = await getFileFromStorage(file.filePath);
+
+    console.log("Creating FIT parser instance...");
     const fitParser = new FitParser({
       force: true,
       speedUnit: 'km/h',
@@ -197,16 +214,22 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       elapsedRecordField: true,
     });
 
-    const parsedData: any = await new Promise((resolve, reject) => {
-      fitParser.parse(buffer, (error: Error, data: any) => {
-        if (error) {
-          console.error("FIT parse error:", error);
-          reject(error);
-        } else {
-          console.log("FIT file parsed successfully, records:", data.records?.length);
-          resolve(data);
-        }
-      });
+    console.log("Parsing FIT file...");
+    const parsedData = await new Promise((resolve, reject) => {
+      try {
+        fitParser.parse(buffer, (error: Error, data: any) => {
+          if (error) {
+            console.error("FIT parse error:", error);
+            reject(error);
+          } else {
+            console.log("Successfully parsed FIT file, records:", data.records?.length);
+            resolve(data);
+          }
+        });
+      } catch (parseError) {
+        console.error("Error during FIT parsing:", parseError);
+        reject(parseError);
+      }
     });
 
     const records = parsedData.records || [];
@@ -231,7 +254,6 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       stack: error.stack,
       fileId: req.params.id
     });
-
     res.status(500).json({ 
       error: `Failed to parse fit file: ${error.message}`,
       details: error.stack
