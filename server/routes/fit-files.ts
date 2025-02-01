@@ -33,14 +33,37 @@ const upload = multer({
 // Helper function to parse FIT file
 async function parseFitFile(buffer: Buffer) {
   try {
-    // Import FIT parser dynamically
-    const module = await import('fit-file-parser');
+    // Import FIT parser using require since it's a CommonJS module
+    const FitParserModule = require('fit-file-parser');
 
-    // Get the FitParser constructor
-    const FitParser = module.default || module.FitParser;
+    console.log('FIT parser module structure:', {
+      moduleType: typeof FitParserModule,
+      hasDefault: 'default' in FitParserModule,
+      hasFitParser: 'FitParser' in FitParserModule,
+      keys: Object.keys(FitParserModule)
+    });
 
-    if (!FitParser) {
-      throw new Error('Failed to load FIT parser module');
+    // Try all possible ways to get the FitParser constructor
+    let FitParser = null;
+    if (typeof FitParserModule === 'function') {
+      FitParser = FitParserModule;
+      console.log('Using FitParserModule directly as constructor');
+    } else if (FitParserModule.FitParser && typeof FitParserModule.FitParser === 'function') {
+      FitParser = FitParserModule.FitParser;
+      console.log('Using FitParserModule.FitParser as constructor');
+    } else if (FitParserModule.default?.FitParser && typeof FitParserModule.default.FitParser === 'function') {
+      FitParser = FitParserModule.default.FitParser;
+      console.log('Using FitParserModule.default.FitParser as constructor');
+    }
+
+    if (!FitParser || typeof FitParser !== 'function') {
+      console.error('Failed to find FitParser constructor:', {
+        moduleStructure: FitParserModule,
+        isFunction: typeof FitParserModule === 'function',
+        hasFitParser: 'FitParser' in FitParserModule,
+        hasDefault: 'default' in FitParserModule
+      });
+      throw new Error('Could not find FitParser constructor in the module');
     }
 
     // Create parser instance
@@ -69,11 +92,14 @@ async function parseFitFile(buffer: Buffer) {
   } catch (error: any) {
     console.error('FIT parser initialization failed:', {
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
+      errorType: error.constructor.name,
+      moduleStructure: error.moduleStructure || 'unknown'
     });
     throw new Error(`FIT parser initialization failed: ${error.message}`);
   }
 }
+
 
 // Public endpoints for shared datasets
 router.get("/shared/:token", async (req: Request, res: Response) => {
