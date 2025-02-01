@@ -7,7 +7,6 @@ import { requireAuth } from "../middleware/auth";
 import { uploadFileToStorage, getFileFromStorage } from "../lib/storage";
 import type { Request, Response } from "express";
 import crypto from 'crypto';
-import { default as FitParser } from 'fit-file-parser';
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
@@ -19,7 +18,7 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
-// Configure multer for memory storage (instead of disk)
+// Configure multer for memory storage
 const upload = multer({ 
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
@@ -30,6 +29,57 @@ const upload = multer({
     }
   },
 });
+
+// Helper function to parse FIT file
+async function parseFitFile(buffer: Buffer) {
+  console.log("Initializing FIT parser...");
+
+  try {
+    // Dynamically import the FIT parser module
+    const FitParserModule = await import('fit-file-parser');
+
+    // Access the FitParser constructor from the module
+    const FitParser = FitParserModule.default;
+
+    if (!FitParser || typeof FitParser !== 'function') {
+      throw new Error('FIT parser module not loaded correctly');
+    }
+
+    console.log("Creating parser instance with options...");
+    const fitParser = new FitParser({
+      force: true,
+      speedUnit: 'km/h',
+      lengthUnit: 'km',
+      elapsedRecordField: true,
+    });
+
+    console.log("Parser instance created successfully");
+
+    return new Promise((resolve, reject) => {
+      try {
+        fitParser.parse(buffer, (error: Error | null, data: any) => {
+          if (error) {
+            console.error("FIT parse error:", error);
+            reject(error);
+          } else {
+            console.log("Successfully parsed FIT file, records:", data?.records?.length || 0);
+            resolve(data);
+          }
+        });
+      } catch (parseError) {
+        console.error("Error during FIT parsing:", parseError);
+        reject(parseError);
+      }
+    });
+  } catch (initError: any) {
+    console.error("Error initializing FIT parser:", {
+      message: initError.message,
+      stack: initError.stack,
+      moduleType: typeof initError
+    });
+    throw new Error(`Failed to initialize FIT parser: ${initError.message}`);
+  }
+}
 
 // Public endpoints for shared datasets
 router.get("/shared/:token", async (req: Request, res: Response) => {
@@ -45,7 +95,6 @@ router.get("/shared/:token", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    // Don't expose sensitive data in shared view
     const sanitizedDataset = {
       id: dataset.id,
       name: dataset.name,
@@ -85,35 +134,13 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
     }
 
     const buffer = await getFileFromStorage(file.filePath);
-    console.log("Creating FIT parser instance...");
+    const parsedData = await parseFitFile(buffer);
 
-    const fitParser = new FitParser({
-      force: true,
-      speedUnit: 'km/h',
-      lengthUnit: 'km',
-      elapsedRecordField: true,
-    });
+    if (!parsedData || !parsedData.records) {
+      throw new Error("Invalid or empty FIT file data");
+    }
 
-    console.log("Parsing FIT file...");
-    const parsedData = await new Promise((resolve, reject) => {
-      try {
-        fitParser.parse(buffer, (error: Error, data: any) => {
-          if (error) {
-            console.error("FIT parse error:", error);
-            reject(error);
-          } else {
-            console.log("Successfully parsed FIT file, records:", data.records?.length);
-            resolve(data);
-          }
-        });
-      } catch (parseError) {
-        console.error("Error during FIT parsing:", parseError);
-        reject(parseError);
-      }
-    });
-
-    const records = parsedData.records || [];
-    const processedData = records.map((record: any, index: number) => ({
+    const processedData = parsedData.records.map((record: any, index: number) => ({
       index,
       power: record.power || 0,
       cadence: record.cadence || 0,
@@ -129,14 +156,14 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
 
     res.json(processedData);
   } catch (error: any) {
-    console.error("Error parsing shared fit file:", {
-      error: error.message,
+    console.error("Error processing shared fit file:", {
+      message: error.message,
       stack: error.stack,
       fileId: req.params.fileId
     });
     res.status(500).json({ 
-      error: `Failed to parse fit file: ${error.message}`,
-      details: error.stack
+      error: "Failed to process fit file",
+      details: error.message
     });
   }
 });
@@ -161,7 +188,7 @@ router.get("/", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Get a single dataset with its fit files for the authenticated user
+// Get a single dataset with its fit files
 router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
@@ -185,7 +212,7 @@ router.get("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Get the parsed data from a fit file for the authenticated user
+// Get file data
 router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const file = await db.query.fitFiles.findFirst({
@@ -205,35 +232,13 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
 
     console.log("Reading file from storage:", file.filePath);
     const buffer = await getFileFromStorage(file.filePath);
+    const parsedData = await parseFitFile(buffer);
 
-    console.log("Creating FIT parser instance...");
-    const fitParser = new FitParser({
-      force: true,
-      speedUnit: 'km/h',
-      lengthUnit: 'km',
-      elapsedRecordField: true,
-    });
+    if (!parsedData || !parsedData.records) {
+      throw new Error("Invalid or empty FIT file data");
+    }
 
-    console.log("Parsing FIT file...");
-    const parsedData = await new Promise((resolve, reject) => {
-      try {
-        fitParser.parse(buffer, (error: Error, data: any) => {
-          if (error) {
-            console.error("FIT parse error:", error);
-            reject(error);
-          } else {
-            console.log("Successfully parsed FIT file, records:", data.records?.length);
-            resolve(data);
-          }
-        });
-      } catch (parseError) {
-        console.error("Error during FIT parsing:", parseError);
-        reject(parseError);
-      }
-    });
-
-    const records = parsedData.records || [];
-    const processedData = records.map((record: any, index: number) => ({
+    const processedData = parsedData.records.map((record: any, index: number) => ({
       index,
       power: record.power || 0,
       cadence: record.cadence || 0,
@@ -250,18 +255,18 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
     res.json(processedData);
   } catch (error: any) {
     console.error("Error parsing fit file:", {
-      error: error.message,
+      message: error.message,
       stack: error.stack,
       fileId: req.params.id
     });
     res.status(500).json({ 
-      error: `Failed to parse fit file: ${error.message}`,
-      details: error.stack
+      error: "Failed to parse fit file",
+      details: error.message
     });
   }
 });
 
-// Upload multiple fit files to a new dataset for the authenticated user
+// Upload multiple fit files to a new dataset
 router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[];
@@ -271,7 +276,6 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 
     const name = req.body.name || 'New Dataset';
 
-    // Create a new dataset with the authenticated user's ID
     const [newDataset] = await db.insert(datasets)
       .values({
         name,
@@ -281,7 +285,6 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
 
     console.log("Created new dataset:", newDataset);
 
-    // Upload files to Firebase Storage and add them to the dataset
     const insertedFiles = await Promise.all(
       files.map(async (file) => {
         console.log("Processing uploaded file:", {
@@ -289,7 +292,6 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
           size: file.size
         });
 
-        // Upload file to Firebase Storage
         const storagePath = await uploadFileToStorage(file.buffer, file.originalname);
 
         const [newFile] = await db.insert(fitFiles)
@@ -308,13 +310,19 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
       ...newDataset,
       fitFiles: insertedFiles,
     });
-  } catch (error) {
-    console.error("Error uploading fit files:", error);
-    res.status(500).json({ error: "Failed to upload fit files" });
+  } catch (error: any) {
+    console.error("Error uploading fit files:", {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: "Failed to upload fit files",
+      details: error.message
+    });
   }
 });
 
-// Delete a dataset and all its files for the authenticated user
+// Delete a dataset and all its files
 router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
@@ -331,7 +339,6 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Dataset not found" });
     }
 
-    // Delete dataset (cascade will delete associated fit files)
     await db.delete(datasets)
       .where(eq(datasets.id, dataset.id));
 
@@ -342,7 +349,7 @@ router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Update dataset name for the authenticated user
+// Update dataset name
 router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
@@ -371,7 +378,7 @@ router.patch("/:id", async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// Share a dataset for the authenticated user
+// Share a dataset
 router.post("/:id/share", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const dataset = await db.query.datasets.findFirst({
