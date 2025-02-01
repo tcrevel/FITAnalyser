@@ -5,13 +5,13 @@ import { eq, and } from "drizzle-orm";
 import multer from "multer";
 import { requireAuth } from "../middleware/auth";
 import { uploadFileToStorage, getFileFromStorage } from "../lib/storage";
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import crypto from 'crypto';
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
   user: {
-    id: string;  // Firebase UID
+    id: string;
     email: string;
   };
 }
@@ -32,52 +32,46 @@ const upload = multer({
 
 // Helper function to parse FIT file
 async function parseFitFile(buffer: Buffer) {
-  console.log("Initializing FIT parser...");
-
   try {
-    // Dynamically import the FIT parser module
-    const FitParserModule = await import('fit-file-parser');
+    // Import FIT parser dynamically
+    const module = await import('fit-file-parser');
 
-    // Access the FitParser constructor from the module
-    const FitParser = FitParserModule.default;
+    // Get the FitParser constructor
+    const FitParser = module.default || module.FitParser;
 
-    if (!FitParser || typeof FitParser !== 'function') {
-      throw new Error('FIT parser module not loaded correctly');
+    if (!FitParser) {
+      throw new Error('Failed to load FIT parser module');
     }
 
-    console.log("Creating parser instance with options...");
-    const fitParser = new FitParser({
+    // Create parser instance
+    const parser = new FitParser({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
       elapsedRecordField: true,
     });
 
-    console.log("Parser instance created successfully");
-
+    // Parse the file
     return new Promise((resolve, reject) => {
-      try {
-        fitParser.parse(buffer, (error: Error | null, data: any) => {
-          if (error) {
-            console.error("FIT parse error:", error);
-            reject(error);
-          } else {
-            console.log("Successfully parsed FIT file, records:", data?.records?.length || 0);
-            resolve(data);
+      parser.parse(buffer, (error: Error | null, data: any) => {
+        if (error) {
+          console.error('FIT parse error:', error);
+          reject(error);
+        } else {
+          if (!data || !Array.isArray(data.records)) {
+            reject(new Error('Invalid FIT file data structure'));
+            return;
           }
-        });
-      } catch (parseError) {
-        console.error("Error during FIT parsing:", parseError);
-        reject(parseError);
-      }
+          resolve(data);
+        }
+      });
     });
-  } catch (initError: any) {
-    console.error("Error initializing FIT parser:", {
-      message: initError.message,
-      stack: initError.stack,
-      moduleType: typeof initError
+  } catch (error: any) {
+    console.error('FIT parser initialization failed:', {
+      message: error.message,
+      stack: error.stack
     });
-    throw new Error(`Failed to initialize FIT parser: ${initError.message}`);
+    throw new Error(`FIT parser initialization failed: ${error.message}`);
   }
 }
 
