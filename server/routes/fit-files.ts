@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/auth";
 import { uploadFileToStorage, getFileFromStorage } from "../lib/storage";
 import type { Request, Response } from "express";
 import crypto from 'crypto';
+import FitParser from 'fit-file-parser';
 
 // Define types for authenticated request
 interface AuthenticatedRequest extends Request {
@@ -84,9 +85,7 @@ router.get("/shared/:token/file/:fileId/data", async (req: Request, res: Respons
     }
 
     const buffer = await getFileFromStorage(file.filePath);
-    const { default: FitParserModule } = await import('fit-file-parser');
-
-    const fitParser = new FitParserModule({
+    const fitParser = new FitParser({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
@@ -189,11 +188,9 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
       return res.status(403).json({ error: "Unauthorized access to file" });
     }
 
-    console.log("Reading file from storage:", file.filePath); // Debug log
+    console.log("Reading file from storage:", file.filePath);
     const buffer = await getFileFromStorage(file.filePath);
-    const { default: FitParserModule } = await import('fit-file-parser');
-
-    const fitParser = new FitParserModule({
+    const fitParser = new FitParser({
       force: true,
       speedUnit: 'km/h',
       lengthUnit: 'km',
@@ -206,7 +203,7 @@ router.get("/file/:id/data", async (req: AuthenticatedRequest, res: Response) =>
           console.error("FIT parse error:", error);
           reject(error);
         } else {
-          console.log("FIT file parsed successfully, records:", data.records?.length); // Debug log
+          console.log("FIT file parsed successfully, records:", data.records?.length);
           resolve(data);
         }
       });
@@ -260,12 +257,12 @@ router.post("/", upload.array("files"), async (req: AuthenticatedRequest, res: R
       })
       .returning();
 
-    console.log("Created new dataset:", newDataset); // Debug log
+    console.log("Created new dataset:", newDataset);
 
     // Upload files to Firebase Storage and add them to the dataset
     const insertedFiles = await Promise.all(
       files.map(async (file) => {
-        console.log("Processing uploaded file:", {  // Debug log
+        console.log("Processing uploaded file:", {
           originalName: file.originalname,
           size: file.size
         });
